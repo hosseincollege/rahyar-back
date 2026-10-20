@@ -1,0 +1,186 @@
+model AccountingInvoice {
+  id             String                           @id @default(cuid())
+  organizationId String
+  createdById    String
+  branchId       String?
+  departmentId   String?
+  documentNumber String
+  title          String
+  description    String?
+  vendorName     String?
+  /// *
+  ///    * در نسخه فعلی فقط invoice داریم.
+  ///    * این فیلد برای توسعه آینده به payment request و سایر اسناد مالی است.
+  moduleType     String                           @default("accounting")
+  status         AccountingInvoiceStatus          @default(PENDING_REVIEW)
+  priority       AccountingPriority               @default(MEDIUM)
+  /// *
+  ///    * مبلغ نهایی در بک‌اند محاسبه می‌شود؛
+  ///    * نباید به total ارسال‌شده توسط فرانت اعتماد شود.
+  totalAmount    Decimal                          @db.Decimal(18, 2)
+  currency       String                           @default("IRR")
+  dueDate        DateTime?
+  metadata       Json?
+  createdAt      DateTime                         @default(now())
+  updatedAt      DateTime                         @updatedAt
+  lineItems      AccountingInvoiceLineItem[]
+  payments       AccountingInvoicePayment[]
+  statusHistory  AccountingInvoiceStatusHistory[]
+  branch         Branch?                          @relation(fields: [branchId], references: [id])
+  createdBy      User                             @relation("AccountingInvoiceCreator", fields: [createdById], references: [id])
+  department     Department?                      @relation(fields: [departmentId], references: [id])
+  organization   Organization                     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, documentNumber])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, status])
+  @@index([organizationId, priority])
+  @@index([organizationId, dueDate])
+  @@index([createdById])
+  @@index([branchId])
+  @@index([departmentId])
+  @@map("accounting_invoices")
+}
+
+model AccountingAccount {
+  id             String   @id @default(cuid())
+  organizationId String
+  code           String
+  name           String
+  type           AccountingAccountType
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  voucherLines   AccountingVoucherLine[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, type])
+  @@map("accounting_accounts")
+}
+
+model AccountingVoucher {
+  id             String   @id @default(cuid())
+  organizationId String
+  createdById    String
+  number         String
+  date           DateTime
+  description    String
+  status         AccountingVoucherStatus @default(DRAFT)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      User @relation("AccountingVoucherCreator", fields: [createdById], references: [id])
+  lines          AccountingVoucherLine[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId, date])
+  @@index([organizationId, status])
+  @@map("accounting_vouchers")
+}
+
+model AccountingVoucherLine {
+  id          String   @id @default(cuid())
+  voucherId   String
+  accountId   String
+  description String?
+  debit       Decimal  @default(0) @db.Decimal(18, 2)
+  credit      Decimal  @default(0) @db.Decimal(18, 2)
+  voucher     AccountingVoucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  account     AccountingAccount @relation(fields: [accountId], references: [id])
+
+  @@index([voucherId])
+  @@index([accountId])
+  @@map("accounting_voucher_lines")
+}
+
+enum AccountingAccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum AccountingVoucherStatus {
+  DRAFT
+  POSTED
+}
+
+model AccountingInvoiceLineItem {
+  id          String            @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Decimal           @db.Decimal(18, 3)
+  unitPrice   Decimal           @db.Decimal(18, 2)
+  taxRate     Decimal           @default(0) @db.Decimal(5, 2)
+  total       Decimal           @db.Decimal(18, 2)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  invoice     AccountingInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("accounting_invoice_line_items")
+}
+
+model AccountingInvoiceStatusHistory {
+  id        String                  @id @default(cuid())
+  invoiceId String
+  actedById String
+  status    AccountingInvoiceStatus
+  note      String?
+  createdAt DateTime                @default(now())
+  actedBy   User                    @relation("AccountingStatusActor", fields: [actedById], references: [id])
+  invoice   AccountingInvoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId, createdAt])
+  @@index([actedById])
+  @@map("accounting_invoice_status_history")
+}
+
+model AccountingInvoicePayment {
+  id              String                   @id @default(cuid())
+  invoiceId       String
+  receivedById    String
+  paidAmount      Decimal                  @db.Decimal(18, 2)
+  paidAt          DateTime                 @default(now())
+  method          AccountingPaymentMethod? @default(BANK_TRANSFER)
+  referenceNumber String?
+  note            String?
+  metadata        Json?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  invoice         AccountingInvoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  receivedBy      User                     @relation("AccountingPaymentReceiver", fields: [receivedById], references: [id])
+
+  @@index([invoiceId, paidAt])
+  @@index([receivedById])
+  @@map("accounting_invoice_payments")
+}
+
+enum AccountingInvoiceStatus {
+  DRAFT
+  SUBMITTED
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum AccountingPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum AccountingPaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CHEQUE
+  CARD
+  ONLINE
+  OTHER
+}

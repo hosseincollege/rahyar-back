@@ -1,0 +1,300 @@
+// ==========================================
+// Microsoft Dynamics CRM Core Models
+// ==========================================
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  DISQUALIFIED
+}
+
+enum DisqualifyReason {
+  NOT_INTERESTED
+  NO_BUDGET
+  UNRESPONSIVE
+  LOST_TO_COMPETITOR
+  OTHER
+}
+
+enum OpportunityState {
+  OPEN
+  WON
+  LOST
+}
+
+enum SalesStage {
+  QUALIFY
+  DEVELOP
+  PROPOSE
+  CLOSE
+}
+
+enum StakeholderRole {
+  DECISION_MAKER
+  INFLUENCER
+  BUYER
+  TECHNICAL_EVALUATOR
+  OTHER
+}
+
+enum ActivityType {
+  TASK
+  PHONE_CALL
+  EMAIL
+  APPOINTMENT
+  NOTE
+}
+
+enum ActivityStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+}
+
+enum CasePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum CaseStatus {
+  NEW
+  IN_PROGRESS
+  WAITING_ON_CUSTOMER
+  RESEARCHING
+  RESOLVED
+  CANCELLED
+}
+
+// ------------------------------------------
+// 1. Account (شرکت‌ها و سازمان‌ها)
+// ------------------------------------------
+model Account {
+  id             String   @id @default(uuid())
+  name           String
+  industry       String?
+  phone          String?
+  website        String?
+  email          String?
+  addressLine1   String?
+  addressLine2   String?
+  city           String?
+  country        String?
+  organizationId String
+  ownerId        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  contacts      Contact[]
+  opportunities Opportunity[]
+  cases         Case[]
+  activities    Activity[]
+
+  @@index([organizationId, createdAt])
+  @@map("crm_accounts")
+}
+
+// ------------------------------------------
+// 2. Contact (اشخاص و رابطین)
+// ------------------------------------------
+model Contact {
+  id             String   @id @default(uuid())
+  firstName      String
+  lastName       String
+  jobTitle       String?
+  email          String?
+  phone          String?
+  mobilePhone    String?
+  accountId      String?
+  organizationId String
+  ownerId        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  account       Account?      @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  opportunities Opportunity[]
+  cases         Case[]
+  activities    Activity[]
+  stakeholders  Stakeholder[]
+
+  @@index([organizationId, accountId])
+  @@map("crm_contacts")
+}
+
+// ------------------------------------------
+// 3. Lead (سرنخ‌های فروش)
+// ------------------------------------------
+model Lead {
+  id                 String            @id @default(uuid())
+  topic              String
+  firstName          String?
+  lastName           String
+  companyName        String?
+  jobTitle           String?
+  email              String?
+  phone              String?
+  source             String?
+  estimatedRevenue   Decimal?          @db.Decimal(12, 2)
+  status             LeadStatus        @default(NEW)
+  disqualifyReason   DisqualifyReason?
+  disqualifyNotes    String?
+  organizationId     String
+  ownerId            String?
+  convertedAccountId String?
+  convertedContactId String?
+  convertedOppId     String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  activities Activity[]
+
+  @@index([organizationId, status, createdAt])
+  @@map("crm_leads")
+}
+
+// ------------------------------------------
+// 4. Opportunity (فرصت‌های فروش)
+// ------------------------------------------
+model Opportunity {
+  id                 String           @id @default(uuid())
+  name               String
+  estimatedRevenue   Decimal?         @db.Decimal(12, 2)
+  actualRevenue      Decimal?         @db.Decimal(12, 2)
+  estimatedCloseDate DateTime?
+  actualCloseDate    DateTime?
+  state              OpportunityState @default(OPEN)
+  stage              SalesStage       @default(QUALIFY)
+  closeReason        String?
+  accountId          String?
+  contactId          String?
+  organizationId     String
+  ownerId            String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  account      Account?      @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  contact      Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  stakeholders Stakeholder[]
+  quotes       Quote[]
+  activities   Activity[]
+
+  @@index([organizationId, state, stage])
+  @@map("crm_opportunities")
+}
+
+// ------------------------------------------
+// 5. Stakeholder (ذی‌نفعان فرصت فروش)
+// ------------------------------------------
+model Stakeholder {
+  id            String          @id @default(uuid())
+  opportunityId String
+  contactId     String
+  role          StakeholderRole @default(DECISION_MAKER)
+  notes         String?
+  createdAt     DateTime        @default(now())
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  contact     Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([opportunityId, contactId])
+  @@map("crm_stakeholders")
+}
+
+// ------------------------------------------
+// 6. Quote & Items (پیش‌فاکتور فروش)
+// ------------------------------------------
+model Quote {
+  id             String   @id @default(uuid())
+  quoteNumber    String   @unique
+  name           String
+  opportunityId  String
+  totalAmount    Decimal  @default(0) @db.Decimal(12, 2)
+  isActive       Boolean  @default(false)
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  opportunity Opportunity     @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  lineItems   QuoteLineItem[]
+
+  @@map("crm_quotes")
+}
+
+model QuoteLineItem {
+  id          String   @id @default(uuid())
+  quoteId     String
+  productId   String?
+  productName String
+  quantity    Int      @default(1)
+  unitPrice   Decimal  @db.Decimal(12, 2)
+  lineTotal   Decimal  @db.Decimal(12, 2)
+  createdAt   DateTime @default(now())
+
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@map("crm_quote_line_items")
+}
+
+// ------------------------------------------
+// 7. Case (تیکت‌ها و پرونده‌های پشتیبانی)
+// ------------------------------------------
+model Case {
+  id              String       @id @default(uuid())
+  ticketNumber    String       @unique
+  title           String
+  description     String?
+  priority        CasePriority @default(NORMAL)
+  status          CaseStatus   @default(NEW)
+  resolution      String?
+  billableHours   Decimal?     @db.Decimal(5, 2)
+  targetResolveAt DateTime?
+  resolvedAt      DateTime?
+  accountId       String?
+  contactId       String?
+  parentCaseId    String?
+  organizationId  String
+  ownerId         String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  account    Account?   @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  contact    Contact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  parentCase Case?      @relation("CaseToCase", fields: [parentCaseId], references: [id], onDelete: SetNull)
+  childCases Case[]     @relation("CaseToCase")
+  activities Activity[]
+
+  @@map("crm_cases")
+}
+
+// ------------------------------------------
+// 8. Activity (فعالیت‌ها و تایم‌لاین یکپارچه)
+// ------------------------------------------
+model Activity {
+  id             String         @id @default(uuid())
+  type           ActivityType
+  subject        String
+  description    String?
+  status         ActivityStatus @default(OPEN)
+  scheduledStart DateTime?
+  scheduledEnd   DateTime?
+  completedAt    DateTime?
+  organizationId String
+  ownerId        String?
+  accountId      String?
+  contactId      String?
+  leadId         String?
+  opportunityId  String?
+  caseId         String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  account     Account?     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  contact     Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  lead        Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  opportunity Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  case        Case?        @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@map("crm_activities")
+}

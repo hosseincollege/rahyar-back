@@ -1,0 +1,247 @@
+model Organization {
+  id                 String                @id @default(cuid())
+  installationId     String?
+  name               String
+  slug               String                @unique
+  legalName          String?
+  nationalId         String?
+  registrationNumber String?
+  economicCode       String?
+  taxOffice          String?
+  phone              String?
+  email              String?
+  website            String?
+  address            String?
+  postalCode         String?
+  currency           String?               @default("IRR")
+  fiscalYearStart    String?               @default("01-01")
+  logoUrl            String?
+  logoTone           String                @default("DARK")
+  logoBackground     String                @default("NONE")
+  status             OrganizationStatus    @default(ACTIVE)
+  ownerId            String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  accountingInvoices AccountingInvoice[]
+  accountingAccounts AccountingAccount[]
+  accountingVouchers AccountingVoucher[]
+  auditLogs          AuditLog[]
+  branches           Branch[]
+  departments        Department[]
+  departmentTeams    DepartmentTeam[]
+  employees          Employee[]
+  leaveRequests      LeaveRequest[]
+  businessTripRequests BusinessTripRequest[]
+  attendanceRecords  AttendanceRecord[]
+  payrollRecords     PayrollRecord[]
+  memberships        OrganizationMember[]
+  settings           OrganizationSettings?
+  installation       Installation?         @relation(fields: [installationId], references: [id])
+  owner              User?                 @relation("OrganizationOwner", fields: [ownerId], references: [id])
+  projects           Project[]
+  roles              Role[]
+  tickets            Ticket[]
+  notifications      Notification[]
+  announcements      Announcement[]
+  testDataRuns        DevelopmentTestDataRun[]
+
+  @@index([installationId])
+  @@index([status])
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id             String           @id @default(cuid())
+  organizationId String
+  userId         String
+  status         MembershipStatus @default(ACTIVE)
+  branchId       String?
+  departmentId   String?
+  teamId         String?
+  joinedAt       DateTime?
+  invitedAt      DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  roles          MemberRole[]
+  branch         Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  department     Department?      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  team           DepartmentTeam?  @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@index([organizationId, status])
+  @@map("organization_members")
+}
+
+model Branch {
+  id                 String              @id @default(cuid())
+  organizationId     String
+  name               String
+  code               String
+  address            String?
+  phone              String?
+  email              String? // فیلد جدید
+  postalCode         String? // فیلد جدید
+  isMain             Boolean             @default(false) // فیلد جدید
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  accountingInvoices AccountingInvoice[]
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  departments        Department[]
+  memberships        OrganizationMember[]
+  employees          Employee[]
+  announcements      Announcement[]
+
+  @@unique([organizationId, code]) // یکتایی کد در سطح هر سازمان
+  @@index([organizationId])
+  @@map("branches")
+}
+
+model Department {
+  id                 String              @id @default(cuid())
+  organizationId     String
+  branchId           String?
+  name               String
+  code               String
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  accountingInvoices AccountingInvoice[]
+  branch             Branch?             @relation(fields: [branchId], references: [id])
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employees          Employee[]
+  managerEmployeeId  String?
+  manager            Employee?           @relation("DepartmentManager", fields: [managerEmployeeId], references: [id], onDelete: SetNull)
+  teams              DepartmentTeam[]
+  memberships        OrganizationMember[]
+
+  @@unique([organizationId, code]) // یکتایی کد در سطح هر سازمان
+  @@index([organizationId])
+  @@index([branchId])
+  @@index([managerEmployeeId])
+  @@map("departments")
+}
+
+model Notification {
+  id              String        @id @default(cuid())
+  organizationId  String
+  recipientUserId String
+  source          String
+  eventKey        String
+  announcementId  String?
+  title           Json
+  body            Json?
+  href            String?
+  metadata        Json?
+  readAt          DateTime?
+  createdAt       DateTime      @default(now())
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  recipient       User          @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  announcement    Announcement? @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@index([recipientUserId, readAt, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([announcementId, recipientUserId])
+  @@map("notifications")
+}
+
+model Announcement {
+  id              String         @id @default(cuid())
+  organizationId  String
+  createdByUserId String?
+  title           String
+  summary         String?
+  body            String
+  locale          String         @default("fa")
+  category        String         @default("general")
+  priority        String         @default("normal")
+  isPinned        Boolean        @default(false)
+  isActive        Boolean        @default(true)
+  allowLikes      Boolean        @default(true)
+  allowReactions  Boolean        @default(true)
+  allowComments   Boolean        @default(true)
+  allowMentions   Boolean        @default(true)
+  branchId        String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy       User?          @relation("AnnouncementCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  notifications   Notification[]
+  branch          Branch?        @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  reactions       AnnouncementReaction[]
+  comments        AnnouncementComment[]
+
+  @@index([organizationId, isActive, isPinned, createdAt])
+  @@map("announcements")
+}
+
+model AnnouncementReaction {
+  id             String       @id @default(cuid())
+  announcementId String
+  userId         String
+  emoji          String       @db.VarChar(16)
+  createdAt      DateTime     @default(now())
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, userId, emoji])
+  @@index([announcementId, createdAt])
+  @@map("announcement_reactions")
+}
+
+model AnnouncementComment {
+  id             String                    @id @default(cuid())
+  announcementId String
+  userId         String
+  body           String                    @db.VarChar(2000)
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  announcement   Announcement              @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user           User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mentions       AnnouncementCommentMention[]
+
+  @@index([announcementId, createdAt])
+  @@map("announcement_comments")
+}
+
+model AnnouncementCommentMention {
+  commentId String
+  userId    String
+  comment   AnnouncementComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId])
+  @@index([userId])
+  @@map("announcement_comment_mentions")
+}
+
+model DevelopmentTestDataRun {
+  id             String   @id @default(cuid())
+  organizationId String
+  appliedById    String
+  moduleKey      String   @db.VarChar(40)
+  recordCounts   Json
+  appliedAt      DateTime @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  appliedBy      User         @relation(fields: [appliedById], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, moduleKey])
+  @@index([appliedById, appliedAt])
+  @@map("development_test_data_runs")
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+  REMOVED
+}

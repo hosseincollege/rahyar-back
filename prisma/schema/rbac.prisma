@@ -1,0 +1,54 @@
+model Role {
+  id             String           @id @default(cuid())
+  name           String
+  key            String
+  description    String?
+  scope          RoleScope        @default(ORGANIZATION)
+  isSystemRole   Boolean          @default(false)
+  organizationId String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  members        MemberRole[]
+  permissions    RolePermission[]
+  organization   Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([key, organizationId])
+  @@index([organizationId])
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(cuid())
+  key         String           @unique
+  name        String
+  description String?
+  createdAt   DateTime         @default(now())
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model MemberRole {
+  memberId String
+  roleId   String
+  member   OrganizationMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  role     Role               @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([memberId, roleId])
+  @@map("member_roles")
+}
+
+enum RoleScope {
+  SYSTEM
+  ORGANIZATION
+}

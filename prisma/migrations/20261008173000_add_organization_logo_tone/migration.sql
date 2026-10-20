@@ -1,0 +1,2 @@
+ALTER TABLE "organizations"
+ADD COLUMN "logoTone" TEXT NOT NULL DEFAULT 'DARK';

@@ -1,0 +1,17 @@
+CREATE TYPE "AccountingAccountType" AS ENUM ('ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE');
+CREATE TYPE "AccountingVoucherStatus" AS ENUM ('DRAFT', 'POSTED');
+CREATE TABLE "accounting_accounts" ("id" TEXT NOT NULL, "organizationId" TEXT NOT NULL, "code" TEXT NOT NULL, "name" TEXT NOT NULL, "type" "AccountingAccountType" NOT NULL, "isActive" BOOLEAN NOT NULL DEFAULT true, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "accounting_accounts_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "accounting_vouchers" ("id" TEXT NOT NULL, "organizationId" TEXT NOT NULL, "createdById" TEXT NOT NULL, "number" TEXT NOT NULL, "date" TIMESTAMP(3) NOT NULL, "description" TEXT NOT NULL, "status" "AccountingVoucherStatus" NOT NULL DEFAULT 'DRAFT', "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL, CONSTRAINT "accounting_vouchers_pkey" PRIMARY KEY ("id"));
+CREATE TABLE "accounting_voucher_lines" ("id" TEXT NOT NULL, "voucherId" TEXT NOT NULL, "accountId" TEXT NOT NULL, "description" TEXT, "debit" DECIMAL(18,2) NOT NULL DEFAULT 0, "credit" DECIMAL(18,2) NOT NULL DEFAULT 0, CONSTRAINT "accounting_voucher_lines_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "accounting_accounts_organizationId_code_key" ON "accounting_accounts"("organizationId", "code");
+CREATE INDEX "accounting_accounts_organizationId_type_idx" ON "accounting_accounts"("organizationId", "type");
+CREATE UNIQUE INDEX "accounting_vouchers_organizationId_number_key" ON "accounting_vouchers"("organizationId", "number");
+CREATE INDEX "accounting_vouchers_organizationId_date_idx" ON "accounting_vouchers"("organizationId", "date");
+CREATE INDEX "accounting_vouchers_organizationId_status_idx" ON "accounting_vouchers"("organizationId", "status");
+CREATE INDEX "accounting_voucher_lines_voucherId_idx" ON "accounting_voucher_lines"("voucherId");
+CREATE INDEX "accounting_voucher_lines_accountId_idx" ON "accounting_voucher_lines"("accountId");
+ALTER TABLE "accounting_accounts" ADD CONSTRAINT "accounting_accounts_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "accounting_vouchers" ADD CONSTRAINT "accounting_vouchers_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "accounting_vouchers" ADD CONSTRAINT "accounting_vouchers_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "accounting_voucher_lines" ADD CONSTRAINT "accounting_voucher_lines_voucherId_fkey" FOREIGN KEY ("voucherId") REFERENCES "accounting_vouchers"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "accounting_voucher_lines" ADD CONSTRAINT "accounting_voucher_lines_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "accounting_accounts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

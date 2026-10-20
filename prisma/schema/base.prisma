@@ -1,0 +1,53 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Installation {
+  id                    String           @id @default(cuid())
+  name                  String?
+  deploymentMode        DeploymentMode   @default(ON_PREMISE)
+  initialSetupCompleted Boolean          @default(false)
+  publicRegistration    Boolean          @default(false)
+  demoEnabled           Boolean          @default(false)
+  requireActivationCode Boolean          @default(true)
+  timezone              String           @default("Asia/Tehran")
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  activationCodes       ActivationCode[]
+  organizations         Organization[]
+
+  @@index([deploymentMode])
+  @@map("installations")
+}
+
+model ActivationCode {
+  id             String        @id @default(cuid())
+  codeHash       String        @unique
+  type           String
+  organizationId String?
+  installationId String?
+  createdById    String?
+  expiresAt      DateTime?
+  usedAt         DateTime?
+  maxUses        Int           @default(1)
+  usedCount      Int           @default(0)
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  createdBy      User?         @relation("ActivationCodeCreator", fields: [createdById], references: [id])
+  installation   Installation? @relation(fields: [installationId], references: [id], onDelete: Cascade)
+
+  @@index([installationId])
+  @@index([organizationId])
+  @@index([type, isActive])
+  @@map("activation_codes")
+}
+
+enum DeploymentMode {
+  CLOUD
+  ON_PREMISE
+}

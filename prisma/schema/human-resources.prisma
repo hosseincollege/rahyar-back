@@ -1,0 +1,216 @@
+model Employee {
+  id                 String                 @id @default(cuid())
+  organizationId     String
+  userId             String?
+  branchId           String?
+  departmentId       String?
+  managerId          String?
+  employeeCode       String
+  firstName          String
+  lastName           String
+  nationalId         String?
+  phone              String?
+  email              String?
+  jobTitle           String?
+  employmentType     EmploymentType         @default(FULL_TIME)
+  status             EmployeeStatus         @default(ACTIVE)
+  hiredAt            DateTime
+  terminatedAt       DateTime?
+  birthDate          DateTime?
+  address            String?
+  emergencyPhone     String?
+  notes              String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  branch             Branch?                @relation(fields: [branchId], references: [id])
+  department         Department?            @relation(fields: [departmentId], references: [id])
+  manager            Employee?              @relation("EmployeeReportingLine", fields: [managerId], references: [id], onDelete: SetNull)
+  directReports      Employee[]             @relation("EmployeeReportingLine")
+  managedDepartments Department[]           @relation("DepartmentManager")
+  managedTeams       DepartmentTeam[]       @relation("DepartmentTeamManager")
+  teamMemberships    DepartmentTeamMember[]
+  organization       Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user               User?                  @relation("EmployeeUserAccount", fields: [userId], references: [id])
+  leaveRequests      LeaveRequest[]
+  businessTripRequests BusinessTripRequest[]
+  attendanceRecords  AttendanceRecord[]
+  payrollRecords     PayrollRecord[]
+
+  @@unique([organizationId, employeeCode])
+  @@index([organizationId, status])
+  @@index([organizationId, departmentId])
+  @@index([organizationId, branchId])
+  @@index([managerId])
+  @@index([userId])
+  @@index([nationalId])
+  @@map("employees")
+}
+
+model LeaveRequest {
+  id              String                      @id @default(cuid())
+  organizationId  String
+  employeeId      String
+  reviewedById    String?
+  leaveType       LeaveType
+  status          LeaveRequestStatus          @default(PENDING)
+  startAt         DateTime
+  endAt           DateTime
+  durationMinutes Int
+  reason          String?
+  reviewerNote    String?
+  reviewedAt      DateTime?
+  cancelledAt     DateTime?
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  statusHistory   LeaveRequestStatusHistory[]
+  employee        Employee                    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  organization    Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reviewedBy      User?                       @relation("LeaveRequestReviewer", fields: [reviewedById], references: [id])
+
+  @@index([organizationId, status])
+  @@index([organizationId, startAt])
+  @@index([employeeId, startAt])
+  @@index([reviewedById])
+  @@map("leave_requests")
+}
+
+model LeaveRequestStatusHistory {
+  id             String             @id @default(cuid())
+  leaveRequestId String
+  actedById      String
+  status         LeaveRequestStatus
+  note           String?
+  createdAt      DateTime           @default(now())
+  actedBy        User               @relation("LeaveRequestStatusActor", fields: [actedById], references: [id])
+  leaveRequest   LeaveRequest       @relation(fields: [leaveRequestId], references: [id], onDelete: Cascade)
+
+  @@index([leaveRequestId, createdAt])
+  @@index([actedById])
+  @@map("leave_request_status_history")
+}
+
+model BusinessTripRequest {
+  id             String             @id @default(cuid())
+  organizationId String
+  employeeId     String
+  reviewedById   String?
+  destination    String
+  purpose        String
+  startAt        DateTime
+  endAt          DateTime
+  estimatedCost  Decimal?           @db.Decimal(18, 2)
+  currency       String             @default("IRR") @db.VarChar(3)
+  status         LeaveRequestStatus @default(PENDING)
+  reviewerNote   String?
+  reviewedAt     DateTime?
+  cancelledAt    DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  employee       Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reviewedBy     User?              @relation("BusinessTripReviewer", fields: [reviewedById], references: [id])
+
+  @@index([organizationId, status])
+  @@index([employeeId, startAt])
+  @@index([reviewedById])
+  @@map("business_trip_requests")
+}
+
+model AttendanceRecord {
+  id             String           @id @default(cuid())
+  organizationId String
+  employeeId     String
+  workDate       DateTime         @db.Date
+  checkInAt      DateTime?
+  checkOutAt     DateTime?
+  status         AttendanceStatus @default(PRESENT)
+  note           String?
+  recordedById   String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee       Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  recordedBy     User?            @relation("AttendanceRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@unique([employeeId, workDate])
+  @@index([organizationId, workDate, status])
+  @@index([employeeId, workDate])
+  @@map("attendance_records")
+}
+
+model PayrollRecord {
+  id             String        @id @default(cuid())
+  organizationId String
+  employeeId     String
+  period         String        @db.VarChar(7)
+  currency       String        @default("IRR") @db.VarChar(3)
+  baseSalary     Decimal       @default(0) @db.Decimal(18, 2)
+  overtime       Decimal       @default(0) @db.Decimal(18, 2)
+  allowances     Decimal       @default(0) @db.Decimal(18, 2)
+  deductions     Decimal       @default(0) @db.Decimal(18, 2)
+  netAmount      Decimal       @default(0) @db.Decimal(18, 2)
+  status         PayrollStatus @default(DRAFT)
+  note           String?
+  createdById    String?
+  approvedById   String?
+  approvedAt     DateTime?
+  paidAt         DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employee       Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdBy      User?         @relation("PayrollCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  approvedBy     User?         @relation("PayrollApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@unique([employeeId, period])
+  @@index([organizationId, period, status])
+  @@index([employeeId, period])
+  @@map("payroll_records")
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  INACTIVE
+  TERMINATED
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACTOR
+  INTERN
+  TEMPORARY
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  UNPAID
+  HOURLY
+  MATERNITY
+  PATERNITY
+  OTHER
+}
+
+enum LeaveRequestStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  REMOTE
+  HALF_DAY
+}
+
+enum PayrollStatus {
+  DRAFT
+  APPROVED
+  PAID
+}

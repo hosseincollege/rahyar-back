@@ -1,0 +1,28 @@
+model OrganizationSettings {
+  id                        String       @id @default(cuid())
+  organizationId            String       @unique
+  timezone                  String?      @default("Asia/Tehran")
+  locale                    String?      @default("fa-IR")
+  currencyCode              String?      @default("IRR")
+  dateFormat                String?      @default("jYYYY/jMM/jDD")
+  accentPreset              String       @default("blue")
+  accentLightColor          String       @default("#60a5fa")
+  accentDarkColor           String       @default("#3b82f6")
+  backgroundStyle           String       @default("GRAY")
+  calendar                  String       @default("persian")
+  publicRegistrationEnabled Boolean      @default(false)
+  bootstrapCompleted        Boolean      @default(false)
+  ticketingEnabled          Boolean      @default(true)
+  inventoryEnabled          Boolean      @default(false)
+  hrEnabled                 Boolean      @default(false)
+  crmEnabled                Boolean      @default(false)
+  salesEnabled              Boolean      @default(false)
+  accountingEnabled         Boolean      @default(false)
+  purchasingEnabled         Boolean      @default(false)
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
+  organization              Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("organization_settings")
+}

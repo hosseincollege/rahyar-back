@@ -1,0 +1,70 @@
+model User {
+  id                        String                           @id @default(cuid())
+  username                  String                           @unique
+  email                     String?                          @unique
+  phone                     String?                          @unique
+  firstName                 String
+  lastName                  String
+  passwordHash              String
+  avatarUrl                 String?
+  status                    UserStatus                       @default(ACTIVE)
+  isSystemUser              Boolean                          @default(false)
+  lastLoginAt               DateTime?
+  createdAt                 DateTime                         @default(now())
+  updatedAt                 DateTime                         @updatedAt
+  receivedInvoicePayments   AccountingInvoicePayment[]       @relation("AccountingPaymentReceiver")
+  accountingStatusActions   AccountingInvoiceStatusHistory[] @relation("AccountingStatusActor")
+  createdAccountingVouchers AccountingVoucher[] @relation("AccountingVoucherCreator")
+  createdAccountingInvoices AccountingInvoice[]              @relation("AccountingInvoiceCreator")
+  createdCodes              ActivationCode[]                 @relation("ActivationCodeCreator")
+  auditLogs                 AuditLog[]
+  employeeProfiles          Employee[]                       @relation("EmployeeUserAccount")
+  leaveRequestStatusActions LeaveRequestStatusHistory[]      @relation("LeaveRequestStatusActor")
+  recordedAttendance        AttendanceRecord[]               @relation("AttendanceRecorder")
+  createdPayrollRecords     PayrollRecord[]                  @relation("PayrollCreator")
+  approvedPayrollRecords    PayrollRecord[]                  @relation("PayrollApprover")
+  reviewedLeaveRequests     LeaveRequest[]                   @relation("LeaveRequestReviewer")
+  reviewedBusinessTrips     BusinessTripRequest[]            @relation("BusinessTripReviewer")
+  memberships               OrganizationMember[]
+  ownedOrganizations        Organization[]                   @relation("OrganizationOwner")
+  ticketMessages            TicketMessage[]
+  assignedTickets           Ticket[]                         @relation("TicketAssignee")
+  createdTickets            Ticket[]                         @relation("TicketCreator")
+  projectMemberships        ProjectMember[] // اضافه شده برای رفع خطای پریزما
+  preferences               UserPreference?
+  notifications             Notification[]
+  createdAnnouncements      Announcement[]                   @relation("AnnouncementCreator")
+  announcementReactions     AnnouncementReaction[]
+  announcementComments      AnnouncementComment[]
+  announcementMentions      AnnouncementCommentMention[]
+  developmentTestDataRuns   DevelopmentTestDataRun[]
+
+  @@index([status])
+  @@index([lastLoginAt])
+  @@map("users")
+}
+
+model UserPreference {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  locale        String   @default("fa")
+  accentColor   String   @default("blue")
+  lightContrast   String   @default("balanced")
+  darkContrast    String   @default("balanced")
+  lightBrightness String   @default("balanced")
+  darkBrightness  String   @default("balanced")
+  workspaceMode  String   @default("FORM")
+  calendar      String   @default("persian")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  DISABLED
+  ARCHIVED
+}

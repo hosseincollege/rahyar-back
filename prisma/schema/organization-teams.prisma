@@ -1,0 +1,32 @@
+model DepartmentTeam {
+  id                String                 @id @default(cuid())
+  organizationId    String
+  departmentId      String
+  managerEmployeeId String?
+  name              String
+  code              String
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  organization      Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department        Department             @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  manager           Employee?              @relation("DepartmentTeamManager", fields: [managerEmployeeId], references: [id], onDelete: SetNull)
+  members           DepartmentTeamMember[]
+  accountMemberships OrganizationMember[]
+
+  @@unique([departmentId, code])
+  @@index([organizationId, departmentId])
+  @@index([managerEmployeeId])
+  @@map("department_teams")
+}
+
+model DepartmentTeamMember {
+  teamId     String
+  employeeId String
+  assignedAt DateTime       @default(now())
+  team       DepartmentTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  employee   Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, employeeId])
+  @@index([employeeId])
+  @@map("department_team_members")
+}

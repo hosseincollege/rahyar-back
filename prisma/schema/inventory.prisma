@@ -1,0 +1,81 @@
+model Warehouse {
+  id             String              @id @default(uuid())
+  organizationId String              @map("organization_id")
+  name           String
+  code           String
+  location       String?
+  isActive       Boolean             @default(true) @map("is_active")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  balances       InventoryBalance[]
+  movementsFrom  InventoryMovement[] @relation("FromWarehouse")
+  movementsTo    InventoryMovement[] @relation("ToWarehouse")
+
+  @@unique([organizationId, code])
+  @@map("warehouses")
+}
+
+model Product {
+  id             String                  @id @default(uuid())
+  organizationId String                  @map("organization_id")
+  name           String
+  sku            String
+  barcode        String?
+  unit           String                  @default("عدد")
+  minStockLevel  Int                     @default(0) @map("min_stock_level")
+  isActive       Boolean                 @default(true) @map("is_active")
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+  balances       InventoryBalance[]
+  movementItems  InventoryMovementItem[]
+
+  @@unique([organizationId, sku])
+  @@map("products")
+}
+
+model InventoryBalance {
+  id          String    @id @default(uuid())
+  productId   String    @map("product_id")
+  warehouseId String    @map("warehouse_id")
+  quantity    Int       @default(0)
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, warehouseId])
+  @@map("inventory_balances")
+}
+
+model InventoryMovement {
+  id              String                  @id @default(uuid())
+  organizationId  String                  @map("organization_id")
+  type            InventoryMovementType
+  referenceNumber String?                 @map("reference_number")
+  fromWarehouseId String?                 @map("from_warehouse_id")
+  toWarehouseId   String?                 @map("to_warehouse_id")
+  notes           String?
+  createdAt       DateTime                @default(now()) @map("created_at")
+  items           InventoryMovementItem[]
+  fromWarehouse   Warehouse?              @relation("FromWarehouse", fields: [fromWarehouseId], references: [id])
+  toWarehouse     Warehouse?              @relation("ToWarehouse", fields: [toWarehouseId], references: [id])
+
+  @@map("inventory_movements")
+}
+
+model InventoryMovementItem {
+  id         String            @id @default(uuid())
+  movementId String            @map("movement_id")
+  productId  String            @map("product_id")
+  quantity   Int
+  movement   InventoryMovement @relation(fields: [movementId], references: [id], onDelete: Cascade)
+  product    Product           @relation(fields: [productId], references: [id])
+
+  @@map("inventory_movement_items")
+}
+
+enum InventoryMovementType {
+  RECEIPT
+  ISSUE
+  TRANSFER
+  ADJUSTMENT
+}

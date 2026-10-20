@@ -1,0 +1,49 @@
+model Visit {
+  id        String   @id @default(cuid())
+  ipAddress String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([ipAddress, createdAt])
+  @@index([createdAt])
+  @@map("visits")
+}
+
+model VisitorPresence {
+  visitorId  String   @id
+  lastSeenAt DateTime @default(now())
+  userAgent  String?
+
+  @@index([lastSeenAt])
+  @@map("visitor_presence")
+}
+
+model VisitorSession {
+  id        String             @id
+  ipAddress String
+  userAgent String?
+  startedAt DateTime           @default(now())
+  lastSeenAt DateTime          @default(now())
+  endedAt   DateTime?
+  pageViews VisitorPageView[]
+
+  @@index([ipAddress, startedAt])
+  @@index([lastSeenAt])
+  @@map("visitor_sessions")
+}
+
+model VisitorPageView {
+  id              String          @id
+  sessionId       String
+  path            String
+  moduleKey       String
+  enteredAt       DateTime        @default(now())
+  lastSeenAt      DateTime        @default(now())
+  leftAt          DateTime?
+  durationSeconds Int             @default(0)
+  session         VisitorSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, enteredAt])
+  @@index([moduleKey, enteredAt])
+  @@map("visitor_page_views")
+}
