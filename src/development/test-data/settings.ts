@@ -1,97 +1,101 @@
-import type { TestDataContext, TestDataCounts } from './context';
-import { fixtureUserId } from './context';
+import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'node:crypto';
+import type { TestDataContext, TestDataSeedResult } from './context';
 
-const branches = [
-  ['TEST-CENTRAL', 'شعبه مرکزی تهران', 'تهران، خیابان ولیعصر، پلاک ۲۴۰'],
-  ['TEST-NORTH', 'شعبه کرج', 'کرج، بلوار شهید بهشتی، پلاک ۸۵'],
-  ['TEST-SOUTH', 'شعبه اصفهان', 'اصفهان، خیابان چهارباغ بالا، پلاک ۱۲۰'],
-] as const;
-const departments = [
-  ['TEST-OPS', 'عملیات و پشتیبانی', 0],
-  ['TEST-SALES', 'فروش سازمانی', 1],
-  ['TEST-FIN', 'مالی و حسابداری', 0],
-  ['TEST-HR', 'منابع انسانی', 0],
-  ['TEST-SUPPORT', 'خدمات مشتریان', 2],
+const provinces = [
+  ['THR', 'تهران'], ['ALB', 'البرز'], ['ESF', 'اصفهان'], ['EAZ', 'آذربایجان شرقی'], ['WAZ', 'آذربایجان غربی'],
+  ['ARD', 'اردبیل'], ['BUS', 'بوشهر'], ['CHB', 'چهارمحال و بختیاری'], ['SKH', 'خراسان جنوبی'], ['RKH', 'خراسان رضوی'],
+  ['NKH', 'خراسان شمالی'], ['KHU', 'خوزستان'], ['ZAN', 'زنجان'], ['SEM', 'سمنان'], ['SIS', 'سیستان و بلوچستان'],
+  ['FAR', 'فارس'], ['QAZ', 'قزوین'], ['QOM', 'قم'], ['KRD', 'کردستان'], ['KRM', 'کرمان'], ['KSH', 'کرمانشاه'],
+  ['KBD', 'کهگیلویه و بویراحمد'], ['GIL', 'گیلان'], ['GOL', 'گلستان'], ['LOR', 'لرستان'], ['MZN', 'مازندران'],
+  ['MKZ', 'مرکزی'], ['HRZ', 'هرمزگان'], ['HMD', 'همدان'], ['YAZ', 'یزد'], ['ILM', 'ایلام'],
 ] as const;
 
-export async function seedSettings(ctx: TestDataContext): Promise<TestDataCounts> {
+const firstNames = ['آرمان', 'مریم', 'نیما', 'سارا', 'امیر', 'نگار', 'رضا', 'الهام', 'کیان', 'نازنین'];
+const lastNames = ['احمدی', 'رضایی', 'کریمی', 'محمدی', 'حسینی', 'جعفری', 'موسوی', 'صادقی', 'مرادی', 'قاسمی'];
+const legacyDepartments = ['TEST-OPS', 'TEST-SALES', 'TEST-FIN', 'TEST-HR', 'TEST-SUPPORT'];
+
+export async function seedSettings(ctx: TestDataContext): Promise<TestDataSeedResult> {
   await ctx.db.organizationSettings.upsert({
     where: { organizationId: ctx.organizationId },
-    create: {
-      organizationId: ctx.organizationId,
-      accentPreset: 'blue',
-      accentLightColor: '#60a5fa',
-      accentDarkColor: '#3b82f6',
-      backgroundStyle: 'GRAY',
-      calendar: 'persian',
-      timezone: 'Asia/Tehran',
-    },
+    create: { organizationId: ctx.organizationId, accentPreset: 'blue', accentLightColor: '#60a5fa', accentDarkColor: '#3b82f6', backgroundStyle: 'GRAY', calendar: 'persian', timezone: 'Asia/Tehran' },
     update: {},
   });
 
-  const savedBranches = [] as Array<{ id: string }>;
-  for (const [code, name, address] of branches) {
-    const legacyBranch = code === 'TEST-CENTRAL'
-      ? { name: 'شعبهٔ آزمایشی مرکزی', address: 'تهران، خیابان نمونه' }
-      : code === 'TEST-NORTH'
-        ? { name: 'شعبهٔ آزمایشی شمال', address: 'تهران، منطقهٔ شمال' }
-        : { name: 'شعبهٔ آزمایشی جنوب', address: 'تهران، منطقهٔ جنوب' };
-    const branch = await ctx.db.branch.upsert({
-      where: { organizationId_code: { organizationId: ctx.organizationId, code } },
-      create: { organizationId: ctx.organizationId, code, name, address, isMain: code === 'TEST-CENTRAL' },
-      update: {},
-      select: { id: true, name: true, address: true },
-    });
-    if (branch.name === legacyBranch.name && branch.address === legacyBranch.address) {
-      await ctx.db.branch.update({ where: { id: branch.id }, data: { name, address } });
-    }
-    savedBranches.push(branch);
-  }
-  for (const [code, name, branchIndex] of departments) {
-    const legacyName = ({ 'TEST-OPS': 'واحد عملیات آزمایشی', 'TEST-SALES': 'واحد فروش آزمایشی', 'TEST-FIN': 'واحد مالی آزمایشی', 'TEST-HR': 'واحد منابع انسانی آزمایشی', 'TEST-SUPPORT': 'واحد پشتیبانی آزمایشی' } as Record<string, string>)[code];
-    const department = await ctx.db.department.upsert({
-      where: { organizationId_code: { organizationId: ctx.organizationId, code } },
-      create: { organizationId: ctx.organizationId, branchId: savedBranches[branchIndex].id, code, name },
-      update: {},
-      select: { id: true, name: true },
-    });
-    if (department.name === legacyName) await ctx.db.department.update({ where: { id: department.id }, data: { name } });
+  const legacyCodes = [['TEST-CENTRAL', 'THR'], ['TEST-NORTH', 'ALB'], ['TEST-SOUTH', 'ESF']] as const;
+  for (const [legacyCode, provinceCode] of legacyCodes) {
+    const current = await ctx.db.branch.findUnique({ where: { organizationId_code: { organizationId: ctx.organizationId, code: `IR-${provinceCode}` } }, select: { id: true } });
+    if (!current) await ctx.db.branch.updateMany({ where: { organizationId: ctx.organizationId, code: legacyCode }, data: { code: `IR-${provinceCode}` } });
   }
 
-  const announcements = [
-    ['برنامه نگهداری سامانه در پنجشنبه شب', 'به‌روزرسانی زیرساخت از ساعت ۲۲ تا ۲۳ انجام می‌شود؛ لطفاً عملیات مالی را پیش از این زمان ثبت کنید.'],
-    ['دوره آموزشی سامانه فروش', 'کارگاه کار با فرایند ثبت سفارش و پیگیری مشتریان روز دوشنبه ساعت ۱۰ در شعبه کرج برگزار می‌شود.'],
-    ['مهلت ارسال اسناد پایان دوره مالی', 'واحدهای مالی تا پایان روز ۲۵ اسفند اسناد هزینه و درآمد را برای بررسی نهایی ارسال کنند.'],
-  ] as const;
-  for (let index = 0; index < announcements.length; index += 1) {
-    const [title, body] = announcements[index];
-    const legacyTitles = ['اطلاعیهٔ آزمایشی: نگهداری سامانه', 'اطلاعیهٔ آزمایشی: برنامهٔ آموزش', 'اطلاعیهٔ آزمایشی: پایان دورهٔ مالی'];
-    let existing = await ctx.db.announcement.findFirst({ where: { organizationId: ctx.organizationId, title }, select: { id: true } });
-    if (!existing) {
-      const legacy = await ctx.db.announcement.findFirst({ where: { organizationId: ctx.organizationId, title: legacyTitles[index] }, select: { id: true, summary: true, body: true } });
-      if (legacy) existing = await ctx.db.announcement.update({ where: { id: legacy.id }, data: {
-        title,
-        ...(legacy.summary === 'اطلاعیهٔ ساختگی برای آزمایش محیط توسعه' ? { summary: 'اطلاع‌رسانی سازمانی درباره برنامه‌های جاری شرکت' } : {}),
-        ...([{ body: 'نمونهٔ اطلاعیهٔ فعال و سنجش نمایش اعلان‌ها.' }, { body: 'نمونهٔ اطلاعیه برای آزمون متن و دسته‌بندی.' }, { body: 'یادآوری نمونه برای آزمون اطلاعیه‌های مهم.' }][index].body === legacy.body ? { body } : {}),
-      }, select: { id: true } });
-    }
-    if (!existing) await ctx.db.announcement.create({ data: {
+  await ctx.db.departmentTeam.deleteMany({
+    where: {
       organizationId: ctx.organizationId,
-      createdByUserId: fixtureUserId(ctx, index),
-      title,
-      summary: 'اطلاع‌رسانی سازمانی درباره برنامه‌های جاری شرکت',
-      body,
-      locale: 'fa',
-      category: ['general', 'training', 'finance'][index],
-      priority: index === 2 ? 'high' : 'normal',
-      isPinned: index === 0,
-      isActive: true,
-      allowLikes: true,
-      allowReactions: true,
-      allowComments: true,
-      allowMentions: true,
-      branchId: index === 1 ? savedBranches[1].id : null,
-    } });
+      department: { code: { in: legacyDepartments } },
+      members: { none: {} },
+      accountMemberships: { none: {} },
+    },
+  });
+  await ctx.db.department.deleteMany({
+    where: {
+      organizationId: ctx.organizationId,
+      code: { in: legacyDepartments },
+      employees: { none: {} },
+      accountingInvoices: { none: {} },
+      memberships: { none: {} },
+      teams: { none: {} },
+    },
+  });
+
+  const savedBranches: Array<{ id: string; code: string; name: string }> = [];
+  for (const [code, name] of provinces) {
+    const branch = await ctx.db.branch.upsert({
+      where: { organizationId_code: { organizationId: ctx.organizationId, code: `IR-${code}` } },
+      create: { organizationId: ctx.organizationId, code: `IR-${code}`, name: `استان ${name}`, isMain: code === 'THR' },
+      update: { name: `استان ${name}` },
+      select: { id: true, code: true, name: true },
+    });
+    savedBranches.push(branch);
   }
-  return { organizationSettings: 1, branches: branches.length, departments: departments.length, announcements: announcements.length };
+
+  const role = await ctx.db.role.upsert({
+    where: { key_organizationId: { key: 'USER', organizationId: ctx.organizationId } },
+    create: { organizationId: ctx.organizationId, name: 'کاربر', key: 'USER', description: 'حساب کاربری نمونه', scope: 'ORGANIZATION', isSystemRole: true },
+    update: {},
+    select: { id: true },
+  });
+  const accounts: NonNullable<TestDataSeedResult['accounts']> = [];
+  for (let provinceIndex = 0; provinceIndex < savedBranches.length; provinceIndex += 1) {
+    const branch = savedBranches[provinceIndex];
+    const provinceCode = branch.code.replace('IR-', '').toLowerCase();
+    for (let accountIndex = 0; accountIndex < 2; accountIndex += 1) {
+      const sequence = accountIndex + 1;
+      const username = `demo_${ctx.organizationId.slice(-10).toLowerCase()}_${provinceCode}_${String(sequence).padStart(2, '0')}`;
+      const firstName = firstNames[(provinceIndex * 2 + accountIndex) % firstNames.length];
+      const lastName = lastNames[(provinceIndex + accountIndex * 3) % lastNames.length];
+      const name = `${firstName} ${lastName}`;
+      const password = `Rh-${randomBytes(12).toString('base64url')}-9a`;
+      const passwordHash = await bcrypt.hash(password, 10);
+      const existing = await ctx.db.user.findUnique({
+        where: { username },
+        select: { id: true, memberships: { where: { organizationId: ctx.organizationId }, select: { id: true } } },
+      });
+      if (existing && existing.memberships.length === 0) {
+        throw new Error(`Test account username is already used outside this organization: ${username}`);
+      }
+      const user = existing
+        ? await ctx.db.user.update({ where: { id: existing.id }, data: { firstName, lastName, passwordHash, status: 'ACTIVE', isSystemUser: false } })
+        : await ctx.db.user.create({ data: { username, firstName, lastName, passwordHash, status: 'ACTIVE', isSystemUser: false } });
+      const membership = await ctx.db.organizationMember.upsert({
+        where: { organizationId_userId: { organizationId: ctx.organizationId, userId: user.id } },
+        create: { organizationId: ctx.organizationId, userId: user.id, status: 'ACTIVE', branchId: branch.id },
+        update: { status: 'ACTIVE', branchId: branch.id, departmentId: null, teamId: null },
+        select: { id: true },
+      });
+      await ctx.db.memberRole.createMany({ data: [{ memberId: membership.id, roleId: role.id }], skipDuplicates: true });
+      accounts.push({ name, username, password, province: branch.name });
+    }
+  }
+
+  return { recordCounts: { provinces: provinces.length, accounts: accounts.length }, accounts };
 }

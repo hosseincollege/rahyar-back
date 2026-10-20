@@ -118,7 +118,8 @@ export class DevelopmentService {
     const userIds = organizationUsers.map(({ userId }) => userId);
     return this.prisma.$transaction(async (db) => {
       const context: TestDataContext = { db, organizationId, userId: actor.id, userIds, now: new Date() };
-      const recordCounts = await seedTestDataModule(moduleKey, context);
+      const result = await seedTestDataModule(moduleKey, context);
+      const recordCounts = result.recordCounts;
       const run = await db.developmentTestDataRun.upsert({
         where: { organizationId_moduleKey: { organizationId, moduleKey } },
         create: { organizationId, appliedById: actor.id, moduleKey, recordCounts },
@@ -130,6 +131,7 @@ export class DevelopmentService {
         appliedAt: run.appliedAt.toISOString(),
         recordCounts,
         totalRecords: Object.values(recordCounts).reduce((total, value) => total + value, 0),
+        ...(result.accounts ? { accounts: result.accounts } : {}),
       };
     }, { maxWait: 15000, timeout: 60000 });
   }

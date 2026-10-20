@@ -1,4 +1,4 @@
-import type { TestDataContext, TestDataCounts } from './context';
+﻿import type { TestDataContext, TestDataSeedResult } from './context';
 import { fixtureDate, fixtureUserId } from './context';
 
 const tickets = [
@@ -8,7 +8,7 @@ const tickets = [
   { subject: 'تأخیر در بارگذاری فهرست کاربران', description: 'بارگذاری فهرست کاربران در ساعات پرترافیک بیشتر از حد معمول طول می‌کشد. لطفاً زمان پاسخ بررسی شود.', type: 'SUPPORT' as const, status: 'RESOLVED' as const, priority: 'LOW' as const, category: 'عملکرد سامانه' },
 ] as const;
 
-export async function seedRahcom(ctx: TestDataContext): Promise<TestDataCounts> {
+export async function seedRahcom(ctx: TestDataContext): Promise<TestDataSeedResult> {
   const maxTicket = await ctx.db.ticket.aggregate({ where: { organizationId: ctx.organizationId }, _max: { ticketNumber: true } });
   let nextNumber = (maxTicket._max.ticketNumber ?? 0) + 1;
   for (let index = 0; index < tickets.length; index += 1) {
@@ -29,5 +29,8 @@ export async function seedRahcom(ctx: TestDataContext): Promise<TestDataCounts> 
       },
     });
   }
-  return { tickets: tickets.length };
+  return { recordCounts: { tickets: tickets.length } };
 }
+
+
+

@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+﻿import type { Prisma } from '@prisma/client';
 
 export type TestDataContext = {
   db: Prisma.TransactionClient;
@@ -9,6 +9,8 @@ export type TestDataContext = {
 };
 
 export type TestDataCounts = Record<string, number>;
+export type TestDataAccountCredential = { name: string; username: string; password: string; province: string };
+export type TestDataSeedResult = { recordCounts: TestDataCounts; accounts?: TestDataAccountCredential[] };
 
 export function fixtureDate(now: Date, daysAgo: number) {
   const value = new Date(now);
@@ -34,3 +36,4 @@ export async function ensureFixtureBranchAndDepartment(ctx: TestDataContext) {
   });
   return { branch, department };
 }
+
