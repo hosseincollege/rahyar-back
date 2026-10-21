@@ -293,7 +293,16 @@ export class SettingsService {
   async getOrganizationAppearance(id: string, user: AuthenticatedUser) {
     const access = await this.getOrganizationAccess(id, user);
     if (!access.canView) {
-      throw new ForbiddenException('مجوز مشاهده تنظیمات این سازمان را ندارید.');
+      // Legacy owner accounts can exist without a membership row. Allow their
+      // verified owner to read the non-sensitive appearance used by the app
+      // shell, while keeping editing and all other settings permission-gated.
+      const ownedOrganization = await this.prisma.organization.findFirst({
+        where: { id, ownerId: user.id, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (!ownedOrganization) {
+        throw new ForbiddenException('مجوز مشاهده تنظیمات این سازمان را ندارید.');
+      }
     }
 
     const settings = await this.prisma.organizationSettings.upsert({

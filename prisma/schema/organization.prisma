@@ -44,6 +44,8 @@ model Organization {
   notifications      Notification[]
   announcements      Announcement[]
   testDataRuns        DevelopmentTestDataRun[]
+  rahcomSystems       RahcomSystem[]
+  rahcomActivities    RahcomActivity[]
 
   @@index([installationId])
   @@index([status])

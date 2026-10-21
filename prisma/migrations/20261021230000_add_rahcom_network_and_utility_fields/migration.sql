@@ -1,0 +1,8 @@
+ALTER TABLE "rahcom_systems"
+  ADD COLUMN "electricityBillId" VARCHAR(120),
+  ADD COLUMN "simIp" VARCHAR(100),
+  ADD COLUMN "radarIp" VARCHAR(100),
+  ADD COLUMN "cameraIp" VARCHAR(100),
+  ADD COLUMN "pcIp" VARCHAR(100),
+  ADD COLUMN "routerIp" VARCHAR(100),
+  ADD COLUMN "laptopIp" VARCHAR(100);

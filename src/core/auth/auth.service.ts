@@ -145,7 +145,15 @@ export class AuthService {
       select: { organizationId: true },
     });
 
-    return this.createAuthResponse(user, membership?.organizationId ?? null);
+    const ownedOrganization = membership
+      ? null
+      : await this.prisma.organization.findFirst({
+          where: { ownerId: user.id, status: 'ACTIVE' },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true },
+        });
+
+    return this.createAuthResponse(user, membership?.organizationId ?? ownedOrganization?.id ?? null);
   }
 
   async validateUser(userId: string) {
@@ -160,7 +168,7 @@ export class AuthService {
     return user;
   }
 
-  async getMe(userId: string) {
+  async getMe(userId: string, activeOrganizationId?: string | null) {
     const user = await this.validateUser(userId);
 
     if (!user) {
@@ -174,10 +182,23 @@ export class AuthService {
         userId,
         status: 'ACTIVE',
         organization: { status: 'ACTIVE' },
+        ...(activeOrganizationId ? { organizationId: activeOrganizationId } : {}),
       },
       orderBy: { createdAt: 'asc' },
       select: { organizationId: true },
     });
+
+    const ownedOrganization = membership
+      ? null
+      : await this.prisma.organization.findFirst({
+          where: {
+            ownerId: userId,
+            status: 'ACTIVE',
+            ...(activeOrganizationId ? { id: activeOrganizationId } : {}),
+          },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true },
+        });
 
     return {
       user: {
@@ -187,7 +208,7 @@ export class AuthService {
         lastName: user.lastName,
         email: user.email,
         phone: user.phone,
-        organizationId: membership?.organizationId ?? null,
+        organizationId: membership?.organizationId ?? ownedOrganization?.id ?? null,
       },
     };
   }

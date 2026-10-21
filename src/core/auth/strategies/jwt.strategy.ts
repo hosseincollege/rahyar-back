@@ -103,6 +103,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       organizationId = activeMembership?.organizationId ?? null;
     }
 
+    // Older owner accounts may have an active organization but no membership
+    // row. Resolve only an organization owned by this user, never another tenant.
+    if (!organizationId) {
+      const ownedOrganization = await this.prisma.organization.findFirst({
+        where: {
+          ownerId: user.id,
+          status: 'ACTIVE',
+          ...(payload.organizationId ? { id: payload.organizationId } : {}),
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+
+      organizationId = ownedOrganization?.id ?? null;
+    }
+
     return {
       id: user.id,
       username: user.username,
