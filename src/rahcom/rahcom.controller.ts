@@ -6,6 +6,7 @@ import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
 import {
   CreateRahcomActivityDto,
   CreateRahcomSystemActivityDto,
+  CreateRahcomSolarSnapshotDto,
   DeleteRahcomSystemsBodyDto,
   DeleteRahcomSystemsQueryDto,
   ImportRahcomSystemsDto,
@@ -55,6 +56,14 @@ export class RahcomController {
   @Post('activities')
   createActivity(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomActivityDto) {
     return this.service.createActivity(user, body);
+  }
+  @Get('solar-snapshots')
+  listSolarSnapshots(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.listSolarSnapshots(user);
+  }
+  @Post('solar-snapshots')
+  createSolarSnapshot(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomSolarSnapshotDto) {
+    return this.service.createSolarSnapshot(user, body);
   }
   @Delete('activities/:id')
   deleteActivity(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {

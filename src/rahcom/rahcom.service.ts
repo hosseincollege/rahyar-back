@@ -4,6 +4,7 @@ import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
 import type {
   CreateRahcomActivityDto,
   CreateRahcomSystemActivityDto,
+  CreateRahcomSolarSnapshotDto,
   ImportRahcomSystemsDto,
   RahcomActivitiesQueryDto,
   UpdateRahcomSystemDto,
@@ -27,7 +28,14 @@ export class RahcomService {
         roles: { select: { role: { select: { key: true, permissions: { select: { permission: { select: { key: true } } } } } } } },
       },
     });
-    if (!membership) throw new ForbiddenException('An active organization membership is required.');
+    if (!membership) {
+      const ownedOrganization = await this.prisma.organization.findFirst({
+        where: { id: organizationId, ownerId: user.id, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (!ownedOrganization) throw new ForbiddenException('An active organization membership is required.');
+      return { organizationId, demoOnly: false };
+    }
     const roles = membership.roles.map(({ role }) => role);
     const demoOnly = roles.some(({ key }) => key.toUpperCase() === 'DEMO_USER');
     if (membership.organization.ownerId === user.id || roles.some(({ key }) => ['ADMIN', 'SUPER_ADMIN'].includes(key.toUpperCase()))) return { organizationId, demoOnly };
@@ -47,14 +55,29 @@ export class RahcomService {
     const { organizationId, demoOnly } = await this.authorize(user);
     return this.prisma.rahcomSystem.findMany({ where: { organizationId, ...(demoOnly ? { systemCode: { startsWith: this.demoSystemPrefix } } : {}), ...(province ? { province } : {}) }, orderBy: [{ province: 'asc' }, { systemName: 'asc' }] });
   }
+  async listSolarSnapshots(user: AuthenticatedUser) {
+    const { organizationId } = await this.authorize(user);
+    return this.prisma.rahcomSolarSnapshot.findMany({ where: { organizationId }, orderBy: { capturedAt: 'desc' }, take: 100 });
+  }
+  async createSolarSnapshot(user: AuthenticatedUser, body: CreateRahcomSolarSnapshotDto) {
+    const { organizationId } = await this.authorize(user, true);
+    const capturedAt = body.capturedAt ? new Date(body.capturedAt) : new Date();
+    if (Number.isNaN(capturedAt.getTime())) throw new BadRequestException('Invalid snapshot date and time.');
+    return this.prisma.rahcomSolarSnapshot.create({ data: {
+      organizationId, createdById: user.id, capturedAt,
+      downText: body.downText, unreachableText: body.unreachableText,
+      equipmentColumns: [...new Set(body.equipmentColumns.map((item) => item.trim()).filter(Boolean))],
+    } });
+  }
   async importSystems(user: AuthenticatedUser, body: ImportRahcomSystemsDto) {
     const { organizationId, demoOnly } = await this.authorize(user, true);
     const province = String(body?.province ?? '').trim();
     if (!province || province.length > 80 || !Array.isArray(body?.systems) || body.systems.length > 10000) throw new BadRequestException('Select a province and provide at most 10,000 rows.');
     const rows = body.systems.map((raw, index): {
-      organizationId: string; province: string; systemName: string; systemCode: string; latitude: number; longitude: number;
+      organizationId: string; province: string; systemName: string; systemCode: string; latitude: number; longitude: number; axis?: string | null;
       details?: string | null; electricityBillId?: string | null; simIp?: string | null; radarIp?: string | null;
       cameraIp?: string | null; pcIp?: string | null; routerIp?: string | null; laptopIp?: string | null;
+      incidentType?: string | null; incidentDetails?: string | null;
     } => {
       const row = raw;
       const systemName = String(row.systemName ?? '').trim();
@@ -65,6 +88,9 @@ export class RahcomService {
       if (demoOnly && !systemCode.startsWith(this.demoSystemPrefix)) throw new ForbiddenException('Demo accounts can only import demo Rahcom systems.');
       const optionalData = {
         ...(row.details !== undefined ? { details: this.optionalText(row.details, 1000) } : {}),
+        ...(row.axis !== undefined ? { axis: this.optionalText(row.axis, 120) } : {}),
+        ...(row.incidentType !== undefined ? { incidentType: row.incidentType } : {}),
+        ...(row.incidentDetails !== undefined ? { incidentDetails: this.optionalText(row.incidentDetails, 1000) } : {}),
         ...(row.electricityBillId !== undefined ? { electricityBillId: this.optionalText(row.electricityBillId, 120) } : {}),
         ...(row.simIp !== undefined ? { simIp: this.optionalText(row.simIp, 100) } : {}),
         ...(row.radarIp !== undefined ? { radarIp: this.optionalText(row.radarIp, 100) } : {}),
@@ -78,12 +104,12 @@ export class RahcomService {
     const codes = new Set<string>();
     for (const row of rows) { if (codes.has(row.systemCode)) throw new BadRequestException(`Duplicate system code: ${row.systemCode}`); codes.add(row.systemCode); }
     await this.prisma.$transaction(rows.map((row) => {
-      const { details, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, ...required } = row;
-      const optionalData = { details, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp };
+      const { details, axis, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, incidentType, incidentDetails, ...required } = row;
+      const optionalData = { details, axis, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, incidentType, incidentDetails };
       return this.prisma.rahcomSystem.upsert({
         where: { organizationId_province_systemCode: { organizationId, province, systemCode: row.systemCode } },
         update: { ...required, ...Object.fromEntries(Object.entries(optionalData).filter(([, value]) => value !== undefined)) },
-        create: { ...required, details: details ?? null, electricityBillId: electricityBillId ?? null, simIp: simIp ?? null, radarIp: radarIp ?? null, cameraIp: cameraIp ?? null, pcIp: pcIp ?? null, routerIp: routerIp ?? null, laptopIp: laptopIp ?? null },
+        create: { ...required, details: details ?? null, axis: axis ?? null, electricityBillId: electricityBillId ?? null, simIp: simIp ?? null, radarIp: radarIp ?? null, cameraIp: cameraIp ?? null, pcIp: pcIp ?? null, routerIp: routerIp ?? null, laptopIp: laptopIp ?? null, incidentType: incidentType ?? null, incidentDetails: incidentDetails ?? null },
       });
     }));
     return { imported: rows.length };
@@ -101,6 +127,9 @@ export class RahcomService {
     if (demoOnly && !systemCode.startsWith(this.demoSystemPrefix)) throw new ForbiddenException('Demo accounts cannot move systems outside the demo dataset.');
     const optionalData = {
       ...(body.details !== undefined ? { details: this.optionalText(body.details, 1000) } : {}),
+      ...(body.axis !== undefined ? { axis: this.optionalText(body.axis, 120) } : {}),
+      ...(body.incidentType !== undefined ? { incidentType: body.incidentType } : {}),
+      ...(body.incidentDetails !== undefined ? { incidentDetails: this.optionalText(body.incidentDetails, 1000) } : {}),
       ...(body.electricityBillId !== undefined ? { electricityBillId: this.optionalText(body.electricityBillId, 120) } : {}),
       ...(body.simIp !== undefined ? { simIp: this.optionalText(body.simIp, 100) } : {}),
       ...(body.radarIp !== undefined ? { radarIp: this.optionalText(body.radarIp, 100) } : {}),

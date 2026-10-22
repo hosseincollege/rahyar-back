@@ -273,6 +273,18 @@ export class SettingsService {
     });
 
     if (!membership) {
+      const ownedOrganization = await this.prisma.organization.findFirst({
+        where: { id, ownerId: user.id, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (ownedOrganization) {
+        return {
+          canView: true, canEdit: true, isAdmin: true, canAccessWorkspace: true,
+          permissionKeys: ['*'], canViewUsers: true, canManageUsers: true,
+          canManageRoles: true, canViewRoles: true, canViewRahcom: true,
+          canManageRahcom: true, branchId: null,
+        };
+      }
       return { canView: false, canEdit: false, isAdmin: false, canAccessWorkspace: false, permissionKeys: [] as string[], canViewUsers: false, canManageUsers: false, canManageRoles: false, canViewRoles: false, canViewRahcom: false, canManageRahcom: false, branchId: null };
     }
 

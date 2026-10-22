@@ -1,23 +1,26 @@
 model RahcomSystem {
-  id             String       @id @default(cuid())
-  organizationId String
-  province       String       @db.VarChar(80)
-  systemName     String       @db.VarChar(200)
-  systemCode     String       @db.VarChar(100)
-  latitude       Float
-  longitude      Float
-  details        String?
-  electricityBillId String?     @db.VarChar(120)
-  simIp          String?        @db.VarChar(100)
-  radarIp        String?        @db.VarChar(100)
-  cameraIp       String?        @db.VarChar(100)
-  pcIp           String?        @db.VarChar(100)
-  routerIp       String?        @db.VarChar(100)
-  laptopIp       String?        @db.VarChar(100)
-  activities     RahcomActivity[]
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id                String           @id @default(cuid())
+  organizationId    String
+  province          String           @db.VarChar(80)
+  systemName        String           @db.VarChar(200)
+  systemCode        String           @db.VarChar(100)
+  axis              String?          @db.VarChar(120)
+  incidentType      String?          @db.VarChar(24)
+  incidentDetails   String?          @db.VarChar(1000)
+  latitude          Float
+  longitude         Float
+  details           String?
+  electricityBillId String?          @db.VarChar(120)
+  simIp             String?          @db.VarChar(100)
+  radarIp           String?          @db.VarChar(100)
+  cameraIp          String?          @db.VarChar(100)
+  pcIp              String?          @db.VarChar(100)
+  routerIp          String?          @db.VarChar(100)
+  laptopIp          String?          @db.VarChar(100)
+  activities        RahcomActivity[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, province, systemCode])
   @@index([organizationId, province])
@@ -25,26 +28,41 @@ model RahcomSystem {
 }
 
 model RahcomActivity {
-  id             String       @id @default(cuid())
-  organizationId String
-  createdById    String
-  systemId       String?
-  systemNameSnapshot String?    @db.VarChar(200)
-  systemCodeSnapshot String?    @db.VarChar(100)
-  provinceSnapshot String?      @db.VarChar(80)
-  activityDate   DateTime     @db.Date
-  activityType   String       @db.VarChar(40)
-  quantity       Int          @default(1)
-  description    String?      @db.VarChar(1000)
-  accompaniedBy  String?      @db.VarChar(200)
-  handedOverTo   String?      @db.VarChar(200)
-  performedBy    String?      @db.VarChar(200)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  system         RahcomSystem? @relation(fields: [systemId], references: [id], onDelete: SetNull)
+  id                 String        @id @default(cuid())
+  organizationId     String
+  createdById        String
+  systemId           String?
+  systemNameSnapshot String?       @db.VarChar(200)
+  systemCodeSnapshot String?       @db.VarChar(100)
+  provinceSnapshot   String?       @db.VarChar(80)
+  activityDate       DateTime      @db.Date
+  activityType       String        @db.VarChar(40)
+  quantity           Int           @default(1)
+  description        String?       @db.VarChar(1000)
+  accompaniedBy      String?       @db.VarChar(200)
+  handedOverTo       String?       @db.VarChar(200)
+  performedBy        String?       @db.VarChar(200)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  organization       Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  system             RahcomSystem? @relation(fields: [systemId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, activityDate])
   @@index([organizationId, systemId, activityDate])
   @@map("rahcom_activities")
+}
+
+model RahcomSolarSnapshot {
+  id               String       @id @default(cuid())
+  organizationId   String
+  createdById      String
+  capturedAt       DateTime     @default(now())
+  downText         String       @db.Text
+  unreachableText  String       @db.Text
+  equipmentColumns String[]     @default([])
+  createdAt        DateTime     @default(now())
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, capturedAt])
+  @@map("rahcom_solar_snapshots")
 }

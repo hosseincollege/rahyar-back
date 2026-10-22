@@ -1,40 +1,40 @@
 model Employee {
-  id                 String                 @id @default(cuid())
-  organizationId     String
-  userId             String?
-  branchId           String?
-  departmentId       String?
-  managerId          String?
-  employeeCode       String
-  firstName          String
-  lastName           String
-  nationalId         String?
-  phone              String?
-  email              String?
-  jobTitle           String?
-  employmentType     EmploymentType         @default(FULL_TIME)
-  status             EmployeeStatus         @default(ACTIVE)
-  hiredAt            DateTime
-  terminatedAt       DateTime?
-  birthDate          DateTime?
-  address            String?
-  emergencyPhone     String?
-  notes              String?
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
-  branch             Branch?                @relation(fields: [branchId], references: [id])
-  department         Department?            @relation(fields: [departmentId], references: [id])
-  manager            Employee?              @relation("EmployeeReportingLine", fields: [managerId], references: [id], onDelete: SetNull)
-  directReports      Employee[]             @relation("EmployeeReportingLine")
-  managedDepartments Department[]           @relation("DepartmentManager")
-  managedTeams       DepartmentTeam[]       @relation("DepartmentTeamManager")
-  teamMemberships    DepartmentTeamMember[]
-  organization       Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user               User?                  @relation("EmployeeUserAccount", fields: [userId], references: [id])
-  leaveRequests      LeaveRequest[]
+  id                   String                 @id @default(cuid())
+  organizationId       String
+  userId               String?
+  branchId             String?
+  departmentId         String?
+  managerId            String?
+  employeeCode         String
+  firstName            String
+  lastName             String
+  nationalId           String?
+  phone                String?
+  email                String?
+  jobTitle             String?
+  employmentType       EmploymentType         @default(FULL_TIME)
+  status               EmployeeStatus         @default(ACTIVE)
+  hiredAt              DateTime
+  terminatedAt         DateTime?
+  birthDate            DateTime?
+  address              String?
+  emergencyPhone       String?
+  notes                String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  branch               Branch?                @relation(fields: [branchId], references: [id])
+  department           Department?            @relation(fields: [departmentId], references: [id])
+  manager              Employee?              @relation("EmployeeReportingLine", fields: [managerId], references: [id], onDelete: SetNull)
+  directReports        Employee[]             @relation("EmployeeReportingLine")
+  managedDepartments   Department[]           @relation("DepartmentManager")
+  managedTeams         DepartmentTeam[]       @relation("DepartmentTeamManager")
+  teamMemberships      DepartmentTeamMember[]
+  organization         Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user                 User?                  @relation("EmployeeUserAccount", fields: [userId], references: [id])
+  leaveRequests        LeaveRequest[]
   businessTripRequests BusinessTripRequest[]
-  attendanceRecords  AttendanceRecord[]
-  payrollRecords     PayrollRecord[]
+  attendanceRecords    AttendanceRecord[]
+  payrollRecords       PayrollRecord[]
 
   @@unique([organizationId, employeeCode])
   @@index([organizationId, status])

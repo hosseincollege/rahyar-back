@@ -3,54 +3,37 @@ import { randomBytes } from 'node:crypto';
 import type { TestDataContext, TestDataSeedResult } from './context';
 
 const branches = [
-  { code: 'DEMO-THR', name: 'شعبه نمونه تهران', address: 'تهران، خیابان ولیعصر' },
-  { code: 'DEMO-ESF', name: 'شعبه نمونه اصفهان', address: 'اصفهان، چهارباغ' },
-  { code: 'DEMO-SHI', name: 'شعبه نمونه شیراز', address: 'شیراز، بلوار کریم‌خان' },
-  { code: 'DEMO-MSH', name: 'شعبه نمونه مشهد', address: 'مشهد، خیابان احمدآباد' },
+  { code: 'DEMO-ESF', name: 'استان اصفهان', address: 'اصفهان' },
 ];
-const departments = [
-  { code: 'DEMO-OPS', name: 'عملیات و پشتیبانی' },
-  { code: 'DEMO-SALES', name: 'فروش و ارتباط با مشتری' },
-  { code: 'DEMO-FIN', name: 'مالی و حسابداری' },
-  { code: 'DEMO-HR', name: 'منابع انسانی' },
-];
+const department = { code: 'DEMO-RAHCOM', name: 'رهکام' };
+const legacyDepartmentCodes = ['DEMO-OPS', 'DEMO-SALES', 'DEMO-FIN', 'DEMO-HR'];
 const demoAccounts = [
-  { key: 'ops', name: 'آرمان احمدی', branch: 0, department: 0 },
-  { key: 'sales', name: 'مریم رضایی', branch: 1, department: 1 },
-  { key: 'finance', name: 'نیما کریمی', branch: 2, department: 2 },
-  { key: 'hr', name: 'سارا محمدی', branch: 3, department: 3 },
+  { key: 'ops', name: 'آرمان احمدی', branch: 0 },
+  { key: 'sales', name: 'مریم رضایی', branch: 0 },
+  { key: 'finance', name: 'نیما کریمی', branch: 0 },
+  { key: 'hr', name: 'سارا محمدی', branch: 0 },
 ];
 
 export const DEMO_SETTINGS_ACCOUNT_PREFIX = 'demo_settings_';
 export const DEMO_SETTINGS_BRANCH_CODES = branches.map(({ code }) => code);
-export const DEMO_SETTINGS_DEPARTMENT_CODES = departments.map(({ code }) => code);
+export const DEMO_SETTINGS_DEPARTMENT_CODES = [department.code, ...legacyDepartmentCodes];
 
 export async function seedSettings(ctx: TestDataContext): Promise<TestDataSeedResult> {
   const savedBranches: Array<{ id: string }> = [];
   for (const [index, branch] of branches.entries()) {
     savedBranches.push(await ctx.db.branch.upsert({
       where: { organizationId_code: { organizationId: ctx.organizationId, code: branch.code } },
-      create: { organizationId: ctx.organizationId, ...branch, isMain: index === 0 },
-      update: {},
+      create: { organizationId: ctx.organizationId, ...branch, isMain: true },
+      update: { name: branch.name, address: branch.address, isMain: true },
       select: { id: true },
     }));
   }
-  const savedDepartments: Array<{ id: string }> = [];
-  for (const [index, department] of departments.entries()) {
-    savedDepartments.push(await ctx.db.department.upsert({
-      where: { organizationId_code: { organizationId: ctx.organizationId, code: department.code } },
-      create: { organizationId: ctx.organizationId, branchId: savedBranches[index].id, ...department },
-      update: {},
-      select: { id: true },
-    }));
-  }
-  for (const [index, department] of departments.entries()) {
-    await ctx.db.departmentTeam.upsert({
-      where: { departmentId_code: { departmentId: savedDepartments[index].id, code: 'DEMO-TEAM' } },
-      create: { organizationId: ctx.organizationId, departmentId: savedDepartments[index].id, code: 'DEMO-TEAM', name: `تیم نمونه ${department.name}` },
-      update: {},
-    });
-  }
+  const rahcomDepartment = await ctx.db.department.upsert({
+    where: { organizationId_code: { organizationId: ctx.organizationId, code: department.code } },
+    create: { organizationId: ctx.organizationId, branchId: savedBranches[0].id, ...department },
+    update: { branchId: savedBranches[0].id, name: department.name },
+    select: { id: true },
+  });
   const role = await ctx.db.role.upsert({
     where: { key_organizationId: { key: 'DEMO_USER', organizationId: ctx.organizationId } },
     create: { organizationId: ctx.organizationId, name: 'کاربر نمونه', key: 'DEMO_USER', description: 'نقش کم‌دسترسی برای حساب‌های نمایشی', scope: 'ORGANIZATION', isSystemRole: false },
@@ -80,12 +63,10 @@ export async function seedSettings(ctx: TestDataContext): Promise<TestDataSeedRe
       const currentMembership = existing.memberships[0];
       if (currentMembership) {
         membershipId = currentMembership.id;
-        if (!currentMembership.branchId || !currentMembership.departmentId) {
-          await ctx.db.organizationMember.update({ where: { id: currentMembership.id }, data: { branchId: savedBranches[account.branch].id, departmentId: savedDepartments[account.department].id } });
-        }
+        await ctx.db.organizationMember.update({ where: { id: currentMembership.id }, data: { branchId: savedBranches[account.branch].id, departmentId: rahcomDepartment.id, teamId: null } });
       } else {
         const membership = await ctx.db.organizationMember.create({
-          data: { organizationId: ctx.organizationId, userId, status: 'ACTIVE', branchId: savedBranches[account.branch].id, departmentId: savedDepartments[account.department].id },
+          data: { organizationId: ctx.organizationId, userId, status: 'ACTIVE', branchId: savedBranches[account.branch].id, departmentId: rahcomDepartment.id },
         });
         membershipId = membership.id;
       }
@@ -93,7 +74,7 @@ export async function seedSettings(ctx: TestDataContext): Promise<TestDataSeedRe
       password = `Rh-${randomBytes(12).toString('base64url')}-9a`;
       const user = await ctx.db.user.create({ data: { username, email, firstName: account.name.split(' ')[0], lastName: account.name.split(' ')[1], passwordHash: await bcrypt.hash(password, 10), status: 'ACTIVE', isSystemUser: false }, select: { id: true } });
       userId = user.id;
-      const membership = await ctx.db.organizationMember.create({ data: { organizationId: ctx.organizationId, userId, status: 'ACTIVE', branchId: savedBranches[account.branch].id, departmentId: savedDepartments[account.department].id } });
+      const membership = await ctx.db.organizationMember.create({ data: { organizationId: ctx.organizationId, userId, status: 'ACTIVE', branchId: savedBranches[account.branch].id, departmentId: rahcomDepartment.id } });
       membershipId = membership.id;
     }
     await ctx.db.memberRole.deleteMany({ where: { memberId: membershipId, roleId: { not: role.id } } });
@@ -101,5 +82,28 @@ export async function seedSettings(ctx: TestDataContext): Promise<TestDataSeedRe
     await ctx.db.userPreference.upsert({ where: { userId }, create: { userId, locale: 'fa', calendar: 'persian' }, update: {} });
     if (password) accounts.push({ name: account.name, username, email, password, province: branches[account.branch].name });
   }
-  return { recordCounts: { branches: branches.length, departments: departments.length, teams: departments.length, accounts: demoAccounts.length, preferences: demoAccounts.length }, ...(accounts.length ? { accounts } : {}) };
+  const legacyDepartments = await ctx.db.department.findMany({ where: { organizationId: ctx.organizationId, code: { in: legacyDepartmentCodes } }, select: { id: true } });
+  const legacyDepartmentIds = legacyDepartments.map(({ id }) => id);
+  if (legacyDepartmentIds.length) {
+    await ctx.db.organizationMember.updateMany({ where: { organizationId: ctx.organizationId, departmentId: { in: legacyDepartmentIds } }, data: { departmentId: rahcomDepartment.id, teamId: null } });
+    await ctx.db.employee.updateMany({ where: { organizationId: ctx.organizationId, departmentId: { in: legacyDepartmentIds } }, data: { departmentId: rahcomDepartment.id } });
+    await ctx.db.accountingInvoice.updateMany({ where: { organizationId: ctx.organizationId, departmentId: { in: legacyDepartmentIds } }, data: { departmentId: rahcomDepartment.id } });
+    await ctx.db.departmentTeam.deleteMany({ where: { organizationId: ctx.organizationId, departmentId: { in: legacyDepartmentIds } } });
+    await ctx.db.department.deleteMany({ where: { organizationId: ctx.organizationId, id: { in: legacyDepartmentIds } } });
+  }
+  const legacyBranches = await ctx.db.branch.findMany({
+    where: { organizationId: ctx.organizationId, code: { in: ['DEMO-THR', 'DEMO-SHI', 'DEMO-MSH'] } },
+    select: { id: true },
+  });
+  const legacyBranchIds = legacyBranches.map(({ id }) => id);
+  if (legacyBranchIds.length) {
+    const mainBranchId = savedBranches[0].id;
+    await ctx.db.organizationMember.updateMany({ where: { organizationId: ctx.organizationId, branchId: { in: legacyBranchIds } }, data: { branchId: mainBranchId } });
+    await ctx.db.employee.updateMany({ where: { organizationId: ctx.organizationId, branchId: { in: legacyBranchIds } }, data: { branchId: mainBranchId } });
+    await ctx.db.accountingInvoice.updateMany({ where: { organizationId: ctx.organizationId, branchId: { in: legacyBranchIds } }, data: { branchId: mainBranchId } });
+    await ctx.db.announcement.updateMany({ where: { organizationId: ctx.organizationId, branchId: { in: legacyBranchIds } }, data: { branchId: mainBranchId } });
+    await ctx.db.department.updateMany({ where: { organizationId: ctx.organizationId, branchId: { in: legacyBranchIds } }, data: { branchId: mainBranchId } });
+    await ctx.db.branch.deleteMany({ where: { organizationId: ctx.organizationId, id: { in: legacyBranchIds } } });
+  }
+  return { recordCounts: { branches: branches.length, departments: 1, teams: 0, accounts: demoAccounts.length, preferences: demoAccounts.length }, ...(accounts.length ? { accounts } : {}) };
 }

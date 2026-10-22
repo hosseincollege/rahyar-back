@@ -1,18 +1,43 @@
 import type { TestDataContext, TestDataSeedResult } from './context';
 import { fixtureDate, fixtureUserId } from './context';
+import { rahcomSystems } from './rahcom-systems';
 
+function canonicalTestAxis(axis: string | null | undefined, latitude: number, longitude: number) {
+  const value = (axis ?? '').trim();
+  const text = value.toLocaleLowerCase('fa').replace(/[\u200c\s\-–—_]/g, '');
+  const has = (...parts: string[]) => parts.some((part) => text.includes(part.toLocaleLowerCase('fa').replace(/[\u200c\s\-–—_]/g, '')));
+  if (has('شهرضا-سمیرم', 'شهرضا-آباده', 'اصفهان-صفاشهر', 'صفاشهر')) return 'محور شهرضا، سمیرم و آباده';
+  if (has('نائین-اردستان', 'اردستان-نائین')) return 'ترانزیت ۷۱؛ نائین و اردستان';
+  if (has('اصفهان-فرودگاه', 'قهجاورستان')) return 'محور اصفهان، فرودگاه و قهجاورستان';
+  if (has('حبیبآباد-اردستان', 'حبیب آباد-اردستان')) return 'محور حبیب‌آباد، کمشچه، اردستان و کاشان';
+  if (has('قم-اصفهان', 'اصفهان-قم1', 'آزادراه امیرکبیر')) return 'آزادراه امیرکبیر';
+  if (has('قم-کاشان-نائین')) return 'جاده قدیم قم، کاشان و نائین';
+  if (has('اصفهان-نایین', 'اصفهان-نائین', 'نایین-انارک-خور', 'خور-طبس', 'یزد-نوگنبد')) return 'محور نائین، خور و بیابانک و یزد';
+  if (has('اصفهان-قم-دلیجان', 'دلیجان-اصفهان', 'دلیجان اصفهان')) return 'محور شاهین‌شهر، نطنز، کاشان و قم';
+  if (has('موته-گلپایگان', 'میمه-موته-گلپایگان', 'آزادراه شهید کاظمی')) return 'محور شاهین‌شهر، میمه و گلپایگان';
+  if (has('نجف آباد فولادشهر', 'نجفآبادفولادشهر')) return 'محور شاهین‌شهر، نجف‌آباد و فولادشهر';
+  if (has('فولادشهر-شهرکرد', 'تیران-سامان-شهرکرد')) return 'محور فولادشهر و شهرکرد';
+  if (has('دامنه-خوانسار-خمین')) return 'محور نجف‌آباد، تیران، خوانسار و خمین';
+  if (has('نجف آباد-الیگودرز', 'نجفآباد-الیگودرز')) {
+    if (latitude < 32.75 && longitude > 50.7) return 'محور نجف‌آباد، تیران، خوانسار و خمین';
+    return 'محور داران، بویین‌میاندشت و الیگودرز';
+  }
+  if (has('اصفهان-قم', 'قم-اصفهان')) return 'آزادراه امیرکبیر';
+  if (has('کاشان')) return 'جاده قدیم قم، کاشان و نائین';
+  if (has('سمیرم')) return 'محور شهرضا، سمیرم و آباده';
+  if (has('نائین', 'نایین', 'خور', 'انارک', 'اردستان', 'یزد', 'نوگنبد')) return 'محور نائین، خور و بیابانک و یزد';
+  if (has('گلپایگان', 'خوانسار', 'خمین', 'الیگودرز', 'داران')) return 'محور نجف‌آباد، تیران، خوانسار و خمین';
+  if (has('شهرکرد')) return 'محور فولادشهر و شهرکرد';
+  return value || null;
+}
+
+const systems = rahcomSystems.map((system) => ({
+  ...system,
+  axis: canonicalTestAxis(system.axis, system.latitude, system.longitude),
+}));
 export const DEMO_RAHCOM_SYSTEM_CODE_PREFIX = 'DEMO-RAHCOM-';
 export const DEMO_RAHCOM_ACTIVITY_PREFIX = 'DEMO-RAHCOM |';
-
-const systems = [
-  { province: 'isfahan', systemName: 'نمونه ایستگاه چهارباغ', systemCode: 'DEMO-RAHCOM-ESF-001', latitude: 32.655, longitude: 51.667, details: 'نمونه آزمایشی برای نمایش سامانه در مرکز استان.', electricityBillId: 'DEMO-ESF-001', simIp: '192.0.2.11', radarIp: '192.0.2.12', cameraIp: '192.0.2.13', pcIp: '192.0.2.14', routerIp: '192.0.2.15', laptopIp: null },
-  { province: 'isfahan', systemName: 'نمونه ایستگاه کاشان', systemCode: 'DEMO-RAHCOM-ESF-002', latitude: 33.985, longitude: 51.41, details: 'نمونه آزمایشی با اطلاعات ارتباطی کامل.', electricityBillId: 'DEMO-ESF-002', simIp: '192.0.2.21', radarIp: null, cameraIp: '192.0.2.22', pcIp: '192.0.2.23', routerIp: '192.0.2.24', laptopIp: null },
-  { province: 'tehran', systemName: 'نمونه ایستگاه مرکزی تهران', systemCode: 'DEMO-RAHCOM-THR-001', latitude: 35.6892, longitude: 51.389, details: 'نمونه آزمایشی برای بررسی جست‌وجو و مسیر‌یابی.', electricityBillId: 'DEMO-THR-001', simIp: '192.0.2.31', radarIp: '192.0.2.32', cameraIp: '192.0.2.33', pcIp: null, routerIp: '192.0.2.34', laptopIp: null },
-  { province: 'fars', systemName: 'نمونه ایستگاه شیراز', systemCode: 'DEMO-RAHCOM-FAR-001', latitude: 29.5918, longitude: 52.5837, details: 'نمونه آزمایشی در استان فارس.', electricityBillId: 'DEMO-FAR-001', simIp: '192.0.2.41', radarIp: null, cameraIp: '192.0.2.42', pcIp: '192.0.2.43', routerIp: '192.0.2.44', laptopIp: '192.0.2.45' },
-  { province: 'khorasan-razavi', systemName: 'نمونه ایستگاه مشهد', systemCode: 'DEMO-RAHCOM-RKH-001', latitude: 36.297, longitude: 59.606, details: 'نمونه آزمایشی در استان خراسان رضوی.', electricityBillId: 'DEMO-RKH-001', simIp: '192.0.2.51', radarIp: '192.0.2.52', cameraIp: null, pcIp: '192.0.2.53', routerIp: '192.0.2.54', laptopIp: null },
-  { province: 'east-azerbaijan', systemName: 'نمونه ایستگاه تبریز', systemCode: 'DEMO-RAHCOM-EAZ-001', latitude: 38.08, longitude: 46.2919, details: 'نمونه آزمایشی در استان آذربایجان شرقی.', electricityBillId: 'DEMO-EAZ-001', simIp: '192.0.2.61', radarIp: '192.0.2.62', cameraIp: '192.0.2.63', pcIp: '192.0.2.64', routerIp: null, laptopIp: null },
-] as const;
-
+export const DEMO_RAHCOM_SYSTEM_CODES = systems.map(({ systemCode }) => systemCode);
 const activities = [
   { key: 'visit-esf-1', systemIndex: 0, daysAgo: 0, description: 'بازدید برنامه‌ریزی‌شده؛ وضعیت برق و ارتباط شبکه بررسی شد.', accompaniedBy: 'کارشناس برق', handedOverTo: 'مسئول شیفت' },
   { key: 'visit-esf-2', systemIndex: 1, daysAgo: 1, description: 'تنظیم مجدد تجهیزات ارتباطی و ثبت نتیجهٔ آزمون اتصال.', accompaniedBy: 'کارشناس شبکه', handedOverTo: null },
@@ -25,14 +50,50 @@ const activities = [
 ] as const;
 
 export async function seedRahcom(ctx: TestDataContext): Promise<TestDataSeedResult> {
+  const legacySystems = await ctx.db.rahcomSystem.findMany({
+    where: { organizationId: ctx.organizationId, systemCode: { startsWith: DEMO_RAHCOM_SYSTEM_CODE_PREFIX } },
+    orderBy: { systemCode: 'asc' },
+    select: { id: true, systemCode: true },
+  });
   const savedSystems: Array<{ id: string; systemName: string; systemCode: string; province: string }> = [];
-  for (const system of systems) {
-    const saved = await ctx.db.rahcomSystem.upsert({
+  const reusedLegacyIds = new Set<string>();
+  for (const [index, system] of systems.entries()) {
+    const existing = await ctx.db.rahcomSystem.findUnique({
       where: { organizationId_province_systemCode: { organizationId: ctx.organizationId, province: system.province, systemCode: system.systemCode } },
-      create: { organizationId: ctx.organizationId, ...system },
-      update: {},
     });
-    savedSystems.push(saved);
+    const legacy = legacySystems[index];
+    if (existing) {
+      const refreshed = await ctx.db.rahcomSystem.update({
+        where: { id: existing.id },
+        data: {
+          systemName: system.systemName,
+          axis: system.axis,
+          latitude: system.latitude,
+          longitude: system.longitude,
+        },
+      });
+      if (legacy && legacy.id !== existing.id) {
+        await ctx.db.rahcomActivity.updateMany({
+          where: { organizationId: ctx.organizationId, systemId: legacy.id },
+          data: { systemId: refreshed.id, systemNameSnapshot: refreshed.systemName, systemCodeSnapshot: refreshed.systemCode, provinceSnapshot: refreshed.province },
+        });
+        await ctx.db.rahcomSystem.delete({ where: { id: legacy.id } });
+        reusedLegacyIds.add(legacy.id);
+      }
+      savedSystems.push(refreshed);
+    } else if (legacy) {
+      const updated = await ctx.db.rahcomSystem.update({ where: { id: legacy.id }, data: system });
+      reusedLegacyIds.add(legacy.id);
+      savedSystems.push(updated);
+    } else {
+      const created = await ctx.db.rahcomSystem.create({ data: { organizationId: ctx.organizationId, ...system } });
+      savedSystems.push(created);
+    }
+  }
+  for (const legacy of legacySystems) {
+    if (reusedLegacyIds.has(legacy.id)) continue;
+    const linkedActivities = await ctx.db.rahcomActivity.count({ where: { organizationId: ctx.organizationId, systemId: legacy.id } });
+    if (linkedActivities === 0) await ctx.db.rahcomSystem.delete({ where: { id: legacy.id } });
   }
 
   for (let index = 0; index < activities.length; index += 1) {
@@ -58,7 +119,7 @@ export async function seedRahcom(ctx: TestDataContext): Promise<TestDataSeedResu
     await ctx.db.rahcomActivity.upsert({
       where: { id: `demo-rahcom-${ctx.organizationId}-${item.key}` },
       create: { id: `demo-rahcom-${ctx.organizationId}-${item.key}`, ...record },
-      update: {},
+      update: record,
     });
   }
 

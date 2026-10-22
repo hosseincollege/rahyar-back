@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayNotEmpty,
   ArrayMinSize,
   IsArray,
   IsIn,
@@ -19,6 +20,9 @@ import {
 export class RahcomSystemImportRowDto {
   @IsString() @MinLength(1) @MaxLength(200) systemName!: string;
   @IsString() @MinLength(1) @MaxLength(100) systemCode!: string;
+  @IsOptional() @IsString() @MaxLength(120) axis?: string | null;
+  @IsOptional() @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE']) incidentType?: string | null;
+  @IsOptional() @IsString() @MaxLength(1000) incidentDetails?: string | null;
   @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-90) @Max(90) latitude!: number;
   @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-180) @Max(180) longitude!: number;
   @IsOptional() @IsString() @MaxLength(1000) details?: string | null;
@@ -40,6 +44,9 @@ export class ImportRahcomSystemsDto {
 export class UpdateRahcomSystemDto {
   @IsOptional() @IsString() @MinLength(1) @MaxLength(200) systemName?: string;
   @IsOptional() @IsString() @MinLength(1) @MaxLength(100) systemCode?: string;
+  @IsOptional() @IsString() @MaxLength(120) axis?: string | null;
+  @IsOptional() @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE']) incidentType?: string | null;
+  @IsOptional() @IsString() @MaxLength(1000) incidentDetails?: string | null;
   @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-90) @Max(90) latitude?: number;
   @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-180) @Max(180) longitude?: number;
   @IsOptional() @IsString() @MaxLength(1000) details?: string | null;
@@ -60,6 +67,13 @@ export class RahcomActivitiesQueryDto {
 
 export class RahcomProvinceQueryDto {
   @IsOptional() @IsString() @MaxLength(80) province?: string;
+}
+
+export class CreateRahcomSolarSnapshotDto {
+  @IsString() @MaxLength(250000) downText!: string;
+  @IsString() @MaxLength(250000) unreachableText!: string;
+  @IsArray() @ArrayNotEmpty() @ArrayMaxSize(50) @IsString({ each: true }) equipmentColumns!: string[];
+  @IsOptional() @IsString() @Matches(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})?$/) capturedAt?: string;
 }
 
 export class CreateRahcomActivityDto {

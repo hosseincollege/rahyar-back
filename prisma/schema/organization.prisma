@@ -1,51 +1,52 @@
 model Organization {
-  id                 String                @id @default(cuid())
-  installationId     String?
-  name               String
-  slug               String                @unique
-  legalName          String?
-  nationalId         String?
-  registrationNumber String?
-  economicCode       String?
-  taxOffice          String?
-  phone              String?
-  email              String?
-  website            String?
-  address            String?
-  postalCode         String?
-  currency           String?               @default("IRR")
-  fiscalYearStart    String?               @default("01-01")
-  logoUrl            String?
-  logoTone           String                @default("DARK")
-  logoBackground     String                @default("NONE")
-  status             OrganizationStatus    @default(ACTIVE)
-  ownerId            String?
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-  accountingInvoices AccountingInvoice[]
-  accountingAccounts AccountingAccount[]
-  accountingVouchers AccountingVoucher[]
-  auditLogs          AuditLog[]
-  branches           Branch[]
-  departments        Department[]
-  departmentTeams    DepartmentTeam[]
-  employees          Employee[]
-  leaveRequests      LeaveRequest[]
+  id                   String                   @id @default(cuid())
+  installationId       String?
+  name                 String
+  slug                 String                   @unique
+  legalName            String?
+  nationalId           String?
+  registrationNumber   String?
+  economicCode         String?
+  taxOffice            String?
+  phone                String?
+  email                String?
+  website              String?
+  address              String?
+  postalCode           String?
+  currency             String?                  @default("IRR")
+  fiscalYearStart      String?                  @default("01-01")
+  logoUrl              String?
+  logoTone             String                   @default("DARK")
+  logoBackground       String                   @default("NONE")
+  status               OrganizationStatus       @default(ACTIVE)
+  ownerId              String?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  accountingInvoices   AccountingInvoice[]
+  accountingAccounts   AccountingAccount[]
+  accountingVouchers   AccountingVoucher[]
+  auditLogs            AuditLog[]
+  branches             Branch[]
+  departments          Department[]
+  departmentTeams      DepartmentTeam[]
+  employees            Employee[]
+  leaveRequests        LeaveRequest[]
   businessTripRequests BusinessTripRequest[]
-  attendanceRecords  AttendanceRecord[]
-  payrollRecords     PayrollRecord[]
-  memberships        OrganizationMember[]
-  settings           OrganizationSettings?
-  installation       Installation?         @relation(fields: [installationId], references: [id])
-  owner              User?                 @relation("OrganizationOwner", fields: [ownerId], references: [id])
-  projects           Project[]
-  roles              Role[]
-  tickets            Ticket[]
-  notifications      Notification[]
-  announcements      Announcement[]
-  testDataRuns        DevelopmentTestDataRun[]
-  rahcomSystems       RahcomSystem[]
-  rahcomActivities    RahcomActivity[]
+  attendanceRecords    AttendanceRecord[]
+  payrollRecords       PayrollRecord[]
+  memberships          OrganizationMember[]
+  settings             OrganizationSettings?
+  installation         Installation?            @relation(fields: [installationId], references: [id])
+  owner                User?                    @relation("OrganizationOwner", fields: [ownerId], references: [id])
+  projects             Project[]
+  roles                Role[]
+  tickets              Ticket[]
+  notifications        Notification[]
+  announcements        Announcement[]
+  testDataRuns         DevelopmentTestDataRun[]
+  rahcomSystems        RahcomSystem[]
+  rahcomActivities     RahcomActivity[]
+  rahcomSolarSnapshots RahcomSolarSnapshot[]
 
   @@index([installationId])
   @@index([status])
@@ -78,7 +79,7 @@ model OrganizationMember {
 }
 
 model Branch {
-  id                 String              @id @default(cuid())
+  id                 String               @id @default(cuid())
   organizationId     String
   name               String
   code               String
@@ -86,12 +87,12 @@ model Branch {
   phone              String?
   email              String? // فیلد جدید
   postalCode         String? // فیلد جدید
-  isMain             Boolean             @default(false) // فیلد جدید
-  isActive           Boolean             @default(true)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  isMain             Boolean              @default(false) // فیلد جدید
+  isActive           Boolean              @default(true)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
   accountingInvoices AccountingInvoice[]
-  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   departments        Department[]
   memberships        OrganizationMember[]
   employees          Employee[]
@@ -103,20 +104,20 @@ model Branch {
 }
 
 model Department {
-  id                 String              @id @default(cuid())
+  id                 String               @id @default(cuid())
   organizationId     String
   branchId           String?
   name               String
   code               String
-  isActive           Boolean             @default(true)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  isActive           Boolean              @default(true)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
   accountingInvoices AccountingInvoice[]
-  branch             Branch?             @relation(fields: [branchId], references: [id])
-  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branch             Branch?              @relation(fields: [branchId], references: [id])
+  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   employees          Employee[]
   managerEmployeeId  String?
-  manager            Employee?           @relation("DepartmentManager", fields: [managerEmployeeId], references: [id], onDelete: SetNull)
+  manager            Employee?            @relation("DepartmentManager", fields: [managerEmployeeId], references: [id], onDelete: SetNull)
   teams              DepartmentTeam[]
   memberships        OrganizationMember[]
 
@@ -151,28 +152,28 @@ model Notification {
 }
 
 model Announcement {
-  id              String         @id @default(cuid())
+  id              String                 @id @default(cuid())
   organizationId  String
   createdByUserId String?
   title           String
   summary         String?
   body            String
-  locale          String         @default("fa")
-  category        String         @default("general")
-  priority        String         @default("normal")
-  isPinned        Boolean        @default(false)
-  isActive        Boolean        @default(true)
-  allowLikes      Boolean        @default(true)
-  allowReactions  Boolean        @default(true)
-  allowComments   Boolean        @default(true)
-  allowMentions   Boolean        @default(true)
+  locale          String                 @default("fa")
+  category        String                 @default("general")
+  priority        String                 @default("normal")
+  isPinned        Boolean                @default(false)
+  isActive        Boolean                @default(true)
+  allowLikes      Boolean                @default(true)
+  allowReactions  Boolean                @default(true)
+  allowComments   Boolean                @default(true)
+  allowMentions   Boolean                @default(true)
   branchId        String?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy       User?          @relation("AnnouncementCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  organization    Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy       User?                  @relation("AnnouncementCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
   notifications   Notification[]
-  branch          Branch?        @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  branch          Branch?                @relation(fields: [branchId], references: [id], onDelete: SetNull)
   reactions       AnnouncementReaction[]
   comments        AnnouncementComment[]
 
@@ -195,14 +196,14 @@ model AnnouncementReaction {
 }
 
 model AnnouncementComment {
-  id             String                    @id @default(cuid())
+  id             String                       @id @default(cuid())
   announcementId String
   userId         String
-  body           String                    @db.VarChar(2000)
-  createdAt      DateTime                  @default(now())
-  updatedAt      DateTime                  @updatedAt
-  announcement   Announcement              @relation(fields: [announcementId], references: [id], onDelete: Cascade)
-  user           User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  body           String                       @db.VarChar(2000)
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+  announcement   Announcement                 @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user           User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
   mentions       AnnouncementCommentMention[]
 
   @@index([announcementId, createdAt])
@@ -221,12 +222,12 @@ model AnnouncementCommentMention {
 }
 
 model DevelopmentTestDataRun {
-  id             String   @id @default(cuid())
+  id             String       @id @default(cuid())
   organizationId String
   appliedById    String
-  moduleKey      String   @db.VarChar(40)
+  moduleKey      String       @db.VarChar(40)
   recordCounts   Json
-  appliedAt      DateTime @default(now())
+  appliedAt      DateTime     @default(now())
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   appliedBy      User         @relation(fields: [appliedById], references: [id], onDelete: Cascade)
 

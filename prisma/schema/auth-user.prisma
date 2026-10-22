@@ -14,7 +14,7 @@ model User {
   updatedAt                 DateTime                         @updatedAt
   receivedInvoicePayments   AccountingInvoicePayment[]       @relation("AccountingPaymentReceiver")
   accountingStatusActions   AccountingInvoiceStatusHistory[] @relation("AccountingStatusActor")
-  createdAccountingVouchers AccountingVoucher[] @relation("AccountingVoucherCreator")
+  createdAccountingVouchers AccountingVoucher[]              @relation("AccountingVoucherCreator")
   createdAccountingInvoices AccountingInvoice[]              @relation("AccountingInvoiceCreator")
   createdCodes              ActivationCode[]                 @relation("ActivationCodeCreator")
   auditLogs                 AuditLog[]
@@ -45,19 +45,19 @@ model User {
 }
 
 model UserPreference {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  locale        String   @default("fa")
-  accentColor   String   @default("blue")
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  locale          String   @default("fa")
+  accentColor     String   @default("blue")
   lightContrast   String   @default("balanced")
   darkContrast    String   @default("balanced")
   lightBrightness String   @default("balanced")
   darkBrightness  String   @default("balanced")
-  workspaceMode  String   @default("FORM")
-  calendar      String   @default("persian")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceMode   String   @default("FORM")
+  calendar        String   @default("persian")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_preferences")
 }

@@ -11,7 +11,7 @@ import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { isTestDataModuleKey, seedTestDataModule, TEST_DATA_MODULES } from './test-data';
 import type { TestDataContext } from './test-data/context';
-import { DEMO_RAHCOM_ACTIVITY_PREFIX, DEMO_RAHCOM_SYSTEM_CODE_PREFIX } from './test-data/rahcom';
+import { DEMO_RAHCOM_ACTIVITY_PREFIX, DEMO_RAHCOM_SYSTEM_CODE_PREFIX, DEMO_RAHCOM_SYSTEM_CODES } from './test-data/rahcom';
 import { DEMO_SETTINGS_ACCOUNT_PREFIX, DEMO_SETTINGS_BRANCH_CODES, DEMO_SETTINGS_DEPARTMENT_CODES } from './test-data/settings';
 
 @Injectable()
@@ -88,9 +88,10 @@ export class DevelopmentService {
 
   async getTestDataStatus(actor: AuthenticatedUser) {
     const { organizationId } = await this.requireAdministrator(actor);
+    const canRefreshTestData = this.testDataResetAllowed() && await this.isFirstOwner(actor.id, organizationId);
     const [runSettings, rahcomSystems, rahcomActivities, branches, departments, teams, accounts, preferences] = await Promise.all([
       this.prisma.developmentTestDataRun.findMany({ where: { organizationId }, select: { moduleKey: true, appliedAt: true } }),
-      this.prisma.rahcomSystem.count({ where: { organizationId, systemCode: { startsWith: DEMO_RAHCOM_SYSTEM_CODE_PREFIX } } }),
+      this.prisma.rahcomSystem.count({ where: { organizationId, OR: [{ systemCode: { startsWith: DEMO_RAHCOM_SYSTEM_CODE_PREFIX } }, { systemCode: { in: DEMO_RAHCOM_SYSTEM_CODES } }] } }),
       this.prisma.rahcomActivity.count({ where: { organizationId, description: { startsWith: DEMO_RAHCOM_ACTIVITY_PREFIX } } }),
       this.prisma.branch.count({ where: { organizationId, code: { in: DEMO_SETTINGS_BRANCH_CODES } } }),
       this.prisma.department.count({ where: { organizationId, code: { in: DEMO_SETTINGS_DEPARTMENT_CODES } } }),
@@ -104,6 +105,7 @@ export class DevelopmentService {
       settings: { branches, departments, teams, accounts, preferences },
     };
     return {
+      canRefreshTestData,
       modules: TEST_DATA_MODULES.map((moduleKey) => {
         const run = byModule.get(moduleKey);
         const recordCounts = countsByModule[moduleKey] ?? {};
@@ -150,6 +152,70 @@ export class DevelopmentService {
         ...(result.accounts ? { accounts: result.accounts } : {}),
       };
     }, { maxWait: 15000, timeout: 60000 });
+  }
+
+  async resetAndSeedTestData(actor: AuthenticatedUser) {
+    if (!this.testDataResetAllowed()) {
+      throw new ForbiddenException('Test-data refresh is available only in local development.');
+    }
+    if (actor.impersonatedBy) {
+      throw new ForbiddenException('Test-data refresh is unavailable while switching accounts.');
+    }
+    const { organizationId } = await this.requireAdministrator(actor);
+    if (!(await this.isFirstOwner(actor.id, organizationId))) {
+      throw new ForbiddenException('Only the original Owner can refresh test data.');
+    }
+    return this.prisma.$transaction(async (db) => {
+      const removedActivities = await db.rahcomActivity.deleteMany({
+        where: { organizationId, description: { startsWith: DEMO_RAHCOM_ACTIVITY_PREFIX } },
+      });
+      const removedLegacySystems = await db.rahcomSystem.deleteMany({
+        where: { organizationId, systemCode: { startsWith: DEMO_RAHCOM_SYSTEM_CODE_PREFIX } },
+      });
+      await db.developmentTestDataRun.deleteMany({
+        where: { organizationId, moduleKey: { in: [...TEST_DATA_MODULES] } },
+      });
+
+      const now = new Date();
+      const context: TestDataContext = { db, organizationId, userId: actor.id, userIds: [actor.id], now };
+      const settings = await seedTestDataModule('settings', context);
+      const activeMembers = await db.organizationMember.findMany({
+        where: { organizationId, status: 'ACTIVE', user: { status: 'ACTIVE' } },
+        orderBy: { user: { username: 'asc' } },
+        select: { userId: true },
+      });
+      const rahcom = await seedTestDataModule('rahcom', {
+        ...context,
+        userIds: activeMembers.map(({ userId }) => userId),
+      });
+      const seeded = { settings, rahcom } as const;
+      const modules: Array<{
+        moduleKey: (typeof TEST_DATA_MODULES)[number];
+        applied: boolean;
+        appliedAt: string;
+        recordCounts: Record<string, number>;
+        totalRecords: number;
+      }> = [];
+      for (const moduleKey of TEST_DATA_MODULES) {
+        const recordCounts = seeded[moduleKey].recordCounts;
+        const run = await db.developmentTestDataRun.create({
+          data: { organizationId, appliedById: actor.id, moduleKey, recordCounts },
+        });
+        modules.push({
+          moduleKey,
+          applied: true,
+          appliedAt: run.appliedAt.toISOString(),
+          recordCounts,
+          totalRecords: Object.values(recordCounts).reduce((total, count) => total + count, 0),
+        });
+      }
+      return {
+        modules,
+        accounts: settings.accounts ?? [],
+        removedTestActivities: removedActivities.count,
+        removedLegacyTestSystems: removedLegacySystems.count,
+      };
+    }, { maxWait: 15000, timeout: 120000 });
   }
 
 
@@ -326,7 +392,14 @@ export class DevelopmentService {
       },
     });
     if (!membership) {
-      throw new ForbiddenException('Ø¹Ø¶ÙˆÛŒØª ÙØ¹Ø§Ù„ Ø¯Ø± Ø³Ø§Ø²Ù…Ø§Ù† Ù„Ø§Ø²Ù… Ø§Ø³Øª.');
+      const ownedOrganization = await this.prisma.organization.findFirst({
+        where: { id: organizationId, ownerId: administratorId, status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (!ownedOrganization) {
+        throw new ForbiddenException('Ø¹Ø¶ÙˆÛŒØª ÙØ¹Ø§Ù„ Ø¯Ø± Ø³Ø§Ø²Ù…Ø§Ù† Ù„Ø§Ø²Ù… Ø§Ø³Øª.');
+      }
+      return { organizationId, administratorId };
     }
 
     const isAdministrator =
@@ -341,5 +414,17 @@ export class DevelopmentService {
     }
 
     return { organizationId, administratorId };
+  }
+
+  private async isFirstOwner(userId: string, organizationId: string) {
+    const [firstSystemUser, organization] = await Promise.all([
+      this.prisma.user.findFirst({ where: { isSystemUser: true }, orderBy: { createdAt: 'asc' }, select: { id: true } }),
+      this.prisma.organization.findUnique({ where: { id: organizationId }, select: { ownerId: true } }),
+    ]);
+    return firstSystemUser?.id === userId && organization?.ownerId === userId;
+  }
+
+  private testDataResetAllowed() {
+    return process.env.NODE_ENV === 'development' && !process.env.VERCEL;
   }
 }

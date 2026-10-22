@@ -1,16 +1,16 @@
 model DepartmentTeam {
-  id                String                 @id @default(cuid())
-  organizationId    String
-  departmentId      String
-  managerEmployeeId String?
-  name              String
-  code              String
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
-  organization      Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  department        Department             @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  manager           Employee?              @relation("DepartmentTeamManager", fields: [managerEmployeeId], references: [id], onDelete: SetNull)
-  members           DepartmentTeamMember[]
+  id                 String                 @id @default(cuid())
+  organizationId     String
+  departmentId       String
+  managerEmployeeId  String?
+  name               String
+  code               String
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  organization       Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  department         Department             @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  manager            Employee?              @relation("DepartmentTeamManager", fields: [managerEmployeeId], references: [id], onDelete: SetNull)
+  members            DepartmentTeamMember[]
   accountMemberships OrganizationMember[]
 
   @@unique([departmentId, code])

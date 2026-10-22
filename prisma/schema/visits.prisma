@@ -19,13 +19,13 @@ model VisitorPresence {
 }
 
 model VisitorSession {
-  id        String             @id
-  ipAddress String
-  userAgent String?
-  startedAt DateTime           @default(now())
+  id         String            @id
+  ipAddress  String
+  userAgent  String?
+  startedAt  DateTime          @default(now())
   lastSeenAt DateTime          @default(now())
-  endedAt   DateTime?
-  pageViews VisitorPageView[]
+  endedAt    DateTime?
+  pageViews  VisitorPageView[]
 
   @@index([ipAddress, startedAt])
   @@index([lastSeenAt])
@@ -33,15 +33,15 @@ model VisitorSession {
 }
 
 model VisitorPageView {
-  id              String          @id
+  id              String         @id
   sessionId       String
   path            String
   moduleKey       String
-  enteredAt       DateTime        @default(now())
-  lastSeenAt      DateTime        @default(now())
+  enteredAt       DateTime       @default(now())
+  lastSeenAt      DateTime       @default(now())
   leftAt          DateTime?
-  durationSeconds Int             @default(0)
-  session         VisitorSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  durationSeconds Int            @default(0)
+  session         VisitorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId, enteredAt])
   @@index([moduleKey, enteredAt])
