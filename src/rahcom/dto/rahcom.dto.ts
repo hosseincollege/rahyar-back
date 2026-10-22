@@ -1,0 +1,86 @@
+import { Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsIn,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
+
+export class RahcomSystemImportRowDto {
+  @IsString() @MinLength(1) @MaxLength(200) systemName!: string;
+  @IsString() @MinLength(1) @MaxLength(100) systemCode!: string;
+  @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-90) @Max(90) latitude!: number;
+  @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-180) @Max(180) longitude!: number;
+  @IsOptional() @IsString() @MaxLength(1000) details?: string | null;
+  @IsOptional() @IsString() @MaxLength(120) electricityBillId?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) simIp?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) radarIp?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) cameraIp?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) pcIp?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) routerIp?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) laptopIp?: string | null;
+}
+
+export class ImportRahcomSystemsDto {
+  @IsString() @MinLength(1) @MaxLength(80) province!: string;
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10000) @ValidateNested({ each: true }) @Type(() => RahcomSystemImportRowDto)
+  systems!: RahcomSystemImportRowDto[];
+}
+
+export class UpdateRahcomSystemDto {
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(200) systemName?: string;
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(100) systemCode?: string;
+  @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-90) @Max(90) latitude?: number;
+  @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-180) @Max(180) longitude?: number;
+  @IsOptional() @IsString() @MaxLength(1000) details?: string | null;
+  @IsOptional() @IsString() @MaxLength(120) electricityBillId?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) simIp?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) radarIp?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) cameraIp?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) pcIp?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) routerIp?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) laptopIp?: string | null;
+}
+
+export class RahcomActivitiesQueryDto {
+  @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) date!: string;
+}
+
+export class RahcomProvinceQueryDto {
+  @IsOptional() @IsString() @MaxLength(80) province?: string;
+}
+
+export class CreateRahcomActivityDto {
+  @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) date!: string;
+  @IsString() @IsIn(['EMAIL_SENT', 'SYSTEM_VISIT', 'OTHER']) activityType!: string;
+  @Type(() => Number) @IsInt() @Min(1) @Max(100000) quantity!: number;
+  @IsOptional() @IsString() @MaxLength(1000) description?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) systemId?: string;
+  @IsOptional() @IsString() @MaxLength(200) accompaniedBy?: string | null;
+  @IsOptional() @IsString() @MaxLength(200) handedOverTo?: string | null;
+}
+
+export class CreateRahcomSystemActivityDto {
+  @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) date!: string;
+  @IsString() @MinLength(1) @MaxLength(1000) description!: string;
+  @IsOptional() @IsString() @MaxLength(200) accompaniedBy?: string | null;
+  @IsOptional() @IsString() @MaxLength(200) handedOverTo?: string | null;
+}
+
+export class DeleteRahcomSystemsQueryDto {
+  @IsOptional() @IsString() @MaxLength(80) province?: string;
+}
+
+export class DeleteRahcomSystemsBodyDto {
+  @IsOptional() @IsArray() @ArrayMaxSize(10000) @IsString({ each: true }) ids?: string[];
+}

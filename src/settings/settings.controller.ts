@@ -216,25 +216,27 @@ export class SettingsController {
   }
 
   @Get('roles/:organizationId')
-  async getRoles(@Param('organizationId') organizationId: string) {
+  async getRoles(@Param('organizationId') organizationId: string, @CurrentUser() user: AuthenticatedUser) {
     if (!organizationId || organizationId.trim() === '') {
       throw new BadRequestException('شناسه سازمان نامعتبر است.');
     }
 
-    return this.settingsService.getRoles(organizationId.trim());
+    return this.settingsService.getRoles(organizationId.trim(), user);
   }
 
   @Put('roles/:organizationId')
   async saveRoles(
     @Param('organizationId') organizationId: string,
-    @Body() roles: SaveRoleDto[],
+    @Body() roles: SaveRoleDto[] | { roles?: SaveRoleDto[]; deletedRoleIds?: string[] },
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     if (!organizationId || organizationId.trim() === '') {
       throw new BadRequestException('شناسه سازمان نامعتبر است.');
     }
 
-    const payload = Array.isArray(roles) ? roles : (roles as any)?.roles || [];
-    return this.settingsService.saveRoles(organizationId.trim(), payload);
+    const payload = Array.isArray(roles) ? roles : roles?.roles || [];
+    const deletedRoleIds = Array.isArray(roles) ? [] : roles?.deletedRoleIds || [];
+    return this.settingsService.saveRoles(organizationId.trim(), payload, user, deletedRoleIds);
   }
 
   @Get('branches/:organizationId')
@@ -364,10 +366,12 @@ export class SettingsController {
 
     // استخراج ایمن لیست کاربران چه به صورت آرایه مستقیم و چه آبجکت
     let usersList: any[] = [];
+    let deletedUserIds: string[] = [];
     if (Array.isArray(usersPayload)) {
       usersList = usersPayload;
     } else if (usersPayload && Array.isArray(usersPayload.users)) {
       usersList = usersPayload.users;
+      if (Array.isArray(usersPayload.deletedUserIds)) deletedUserIds = usersPayload.deletedUserIds;
     } else if (usersPayload && Array.isArray(usersPayload.data)) {
       usersList = usersPayload.data;
     }
@@ -376,6 +380,7 @@ export class SettingsController {
       organizationId.trim(),
       usersList,
       user,
+      deletedUserIds,
     );
   }
 

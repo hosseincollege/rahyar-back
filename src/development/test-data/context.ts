@@ -9,14 +9,21 @@ export type TestDataContext = {
 };
 
 export type TestDataCounts = Record<string, number>;
-export type TestDataAccountCredential = { name: string; username: string; password: string; province: string };
+export type TestDataAccountCredential = { name: string; username: string; email: string; password: string; province: string };
 export type TestDataSeedResult = { recordCounts: TestDataCounts; accounts?: TestDataAccountCredential[] };
 
 export function fixtureDate(now: Date, daysAgo: number) {
-  const value = new Date(now);
-  value.setUTCDate(value.getUTCDate() - daysAgo);
-  value.setUTCHours(9, 0, 0, 0);
-  return value;
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tehran',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  const year = Number(values.year);
+  const month = Number(values.month);
+  const day = Number(values.day);
+  return new Date(Date.UTC(year, month - 1, day - daysAgo, 9, 0, 0, 0));
 }
 
 export function fixtureUserId(ctx: TestDataContext, index: number) {

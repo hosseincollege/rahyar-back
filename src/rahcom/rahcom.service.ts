@@ -1,25 +1,53 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../core/prisma/prisma.service';
 import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
+import type {
+  CreateRahcomActivityDto,
+  CreateRahcomSystemActivityDto,
+  ImportRahcomSystemsDto,
+  UpdateRahcomSystemDto,
+} from './dto/rahcom.dto';
 
 @Injectable()
 export class RahcomService {
+  private readonly demoSystemPrefix = 'DEMO-RAHCOM-';
+  private readonly demoActivityPrefix = 'DEMO-RAHCOM |';
   constructor(private readonly prisma: PrismaService) {}
   private organization(user: AuthenticatedUser) {
     if (!user.organizationId) throw new BadRequestException('No active organization is selected.');
     return user.organizationId;
   }
+  private async authorize(user: AuthenticatedUser, write = false) {
+    const organizationId = this.organization(user);
+    const membership = await this.prisma.organizationMember.findFirst({
+      where: { organizationId, userId: user.id, status: 'ACTIVE', organization: { status: 'ACTIVE' } },
+      select: {
+        organization: { select: { ownerId: true } },
+        roles: { select: { role: { select: { key: true, permissions: { select: { permission: { select: { key: true } } } } } } } },
+      },
+    });
+    if (!membership) throw new ForbiddenException('An active organization membership is required.');
+    const roles = membership.roles.map(({ role }) => role);
+    const demoOnly = roles.some(({ key }) => key.toUpperCase() === 'DEMO_USER');
+    if (membership.organization.ownerId === user.id || roles.some(({ key }) => ['ADMIN', 'SUPER_ADMIN'].includes(key.toUpperCase()))) return { organizationId, demoOnly };
+    const permissions = new Set(roles.flatMap(({ permissions }) => permissions.map(({ permission }) => permission.key)));
+    if (write ? !permissions.has('rahcom.write') : !permissions.has('rahcom.read') && !permissions.has('rahcom.write')) {
+      throw new ForbiddenException('You do not have permission to access Rahcom.');
+    }
+    return { organizationId, demoOnly };
+  }
   private validDate(value: unknown) {
     if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new BadRequestException('Date must use YYYY-MM-DD.');
     const date = new Date(`${value}T00:00:00.000Z`);
-    if (Number.isNaN(date.getTime())) throw new BadRequestException('Invalid date.');
+    if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw new BadRequestException('Invalid date.');
     return date;
   }
   async listSystems(user: AuthenticatedUser, province?: string) {
-    return this.prisma.rahcomSystem.findMany({ where: { organizationId: this.organization(user), ...(province ? { province } : {}) }, orderBy: [{ province: 'asc' }, { systemName: 'asc' }] });
+    const { organizationId, demoOnly } = await this.authorize(user);
+    return this.prisma.rahcomSystem.findMany({ where: { organizationId, ...(demoOnly ? { systemCode: { startsWith: this.demoSystemPrefix } } : {}), ...(province ? { province } : {}) }, orderBy: [{ province: 'asc' }, { systemName: 'asc' }] });
   }
-  async importSystems(user: AuthenticatedUser, body: { province: string; systems: unknown[] }) {
-    const organizationId = this.organization(user);
+  async importSystems(user: AuthenticatedUser, body: ImportRahcomSystemsDto) {
+    const { organizationId, demoOnly } = await this.authorize(user, true);
     const province = String(body?.province ?? '').trim();
     if (!province || province.length > 80 || !Array.isArray(body?.systems) || body.systems.length > 10000) throw new BadRequestException('Select a province and provide at most 10,000 rows.');
     const rows = body.systems.map((raw, index): {
@@ -27,12 +55,13 @@ export class RahcomService {
       details?: string | null; electricityBillId?: string | null; simIp?: string | null; radarIp?: string | null;
       cameraIp?: string | null; pcIp?: string | null; routerIp?: string | null; laptopIp?: string | null;
     } => {
-      const row = raw as Record<string, unknown>;
+      const row = raw;
       const systemName = String(row.systemName ?? '').trim();
       const systemCode = String(row.systemCode ?? '').trim();
       const latitude = Number(row.latitude);
       const longitude = Number(row.longitude);
       if (!systemName || !systemCode || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) throw new BadRequestException(`Invalid system row ${index + 1}. Check name, code, latitude and longitude.`);
+      if (demoOnly && !systemCode.startsWith(this.demoSystemPrefix)) throw new ForbiddenException('Demo accounts can only import demo Rahcom systems.');
       const optionalData = {
         ...(row.details !== undefined ? { details: this.optionalText(row.details, 1000) } : {}),
         ...(row.electricityBillId !== undefined ? { electricityBillId: this.optionalText(row.electricityBillId, 120) } : {}),
@@ -58,15 +87,17 @@ export class RahcomService {
     }));
     return { imported: rows.length };
   }
-  async updateSystem(user: AuthenticatedUser, id: string, body: Record<string, unknown>) {
-    const organizationId = this.organization(user);
-    const existing = await this.prisma.rahcomSystem.findFirst({ where: { id, organizationId } });
+  async updateSystem(user: AuthenticatedUser, id: string, body: UpdateRahcomSystemDto) {
+    const { organizationId, demoOnly } = await this.authorize(user, true);
+    if (Object.keys(body).length === 0) throw new BadRequestException('Provide at least one system field to update.');
+    const existing = await this.prisma.rahcomSystem.findFirst({ where: { id, organizationId, ...(demoOnly ? { systemCode: { startsWith: this.demoSystemPrefix } } : {}) } });
     if (!existing) throw new NotFoundException('System not found.');
     const systemName = body.systemName === undefined ? existing.systemName : String(body.systemName ?? '').trim();
     const systemCode = body.systemCode === undefined ? existing.systemCode : String(body.systemCode ?? '').trim();
     const latitude = body.latitude === undefined ? existing.latitude : Number(body.latitude);
     const longitude = body.longitude === undefined ? existing.longitude : Number(body.longitude);
     if (!systemName || !systemCode || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) throw new BadRequestException('Invalid system fields.');
+    if (demoOnly && !systemCode.startsWith(this.demoSystemPrefix)) throw new ForbiddenException('Demo accounts cannot move systems outside the demo dataset.');
     const optionalData = {
       ...(body.details !== undefined ? { details: this.optionalText(body.details, 1000) } : {}),
       ...(body.electricityBillId !== undefined ? { electricityBillId: this.optionalText(body.electricityBillId, 120) } : {}),
@@ -84,57 +115,65 @@ export class RahcomService {
     return text ? text.slice(0, maxLength) : null;
   }
   async deleteSystem(user: AuthenticatedUser, id: string) {
-    const result = await this.prisma.rahcomSystem.deleteMany({ where: { id, organizationId: this.organization(user) } });
+    const { organizationId, demoOnly } = await this.authorize(user, true);
+    const result = await this.prisma.rahcomSystem.deleteMany({ where: { id, organizationId, ...(demoOnly ? { systemCode: { startsWith: this.demoSystemPrefix } } : {}) } });
     if (!result.count) throw new NotFoundException('System not found.');
     return { deleted: true };
   }
   async deleteSystems(user: AuthenticatedUser, input: { province?: string; ids?: string[] }) {
-    const organizationId = this.organization(user);
+    const { organizationId, demoOnly } = await this.authorize(user, true);
     const province = String(input.province ?? '').trim();
     const ids = Array.isArray(input.ids) ? [...new Set(input.ids.filter((id) => typeof id === 'string' && id.trim()).map((id) => id.trim()))] : [];
     if ((!province && !ids.length) || ids.length > 10000) throw new BadRequestException('Select a province or provide up to 10,000 system IDs.');
-    const result = await this.prisma.rahcomSystem.deleteMany({ where: { organizationId, ...(province ? { province } : { id: { in: ids } }) } });
+    const result = await this.prisma.rahcomSystem.deleteMany({ where: { organizationId, ...(demoOnly ? { systemCode: { startsWith: this.demoSystemPrefix } } : {}), ...(province ? { province } : { id: { in: ids } }) } });
     return { deleted: result.count };
   }
-  listActivities(user: AuthenticatedUser, date: string) {
+  async listActivities(user: AuthenticatedUser, date: string) {
+    const { organizationId, demoOnly } = await this.authorize(user);
     const activityDate = this.validDate(date);
-    return this.prisma.rahcomActivity.findMany({ where: { organizationId: this.organization(user), activityDate }, include: { system: { select: { id: true, systemName: true, systemCode: true, province: true } } }, orderBy: { createdAt: 'desc' } });
+    return this.prisma.rahcomActivity.findMany({ where: { organizationId, activityDate, ...(demoOnly ? { description: { startsWith: this.demoActivityPrefix } } : {}) }, include: { system: { select: { id: true, systemName: true, systemCode: true, province: true } } }, orderBy: { createdAt: 'desc' } });
   }
-  createActivity(user: AuthenticatedUser, body: Record<string, unknown>) {
+  createActivity(user: AuthenticatedUser, body: CreateRahcomActivityDto) {
+    return this.createAuthorizedActivity(user, body);
+  }
+  private async createAuthorizedActivity(user: AuthenticatedUser, body: CreateRahcomActivityDto) {
+    const { organizationId, demoOnly } = await this.authorize(user, true);
     const activityType = String(body.activityType ?? '').trim();
     const quantity = Number(body.quantity);
     const allowed = ['EMAIL_SENT', 'SYSTEM_VISIT', 'OTHER'];
     if (!allowed.includes(activityType) || !Number.isInteger(quantity) || quantity < 1 || quantity > 100000) throw new BadRequestException('Invalid activity type or quantity.');
-    const organizationId = this.organization(user);
     const systemId = body.systemId ? String(body.systemId).trim() : null;
-    if (systemId) return this.createVisitRecord(user, organizationId, systemId, body);
-    return this.prisma.rahcomActivity.create({ data: { organizationId, createdById: user.id, performedBy: `${user.firstName} ${user.lastName}`.trim() || user.username, activityDate: this.validDate(body.date), activityType, quantity, description: body.description ? String(body.description).slice(0, 1000) : null } });
+    if (systemId) return this.createVisitRecord(user, organizationId, systemId, body, demoOnly);
+    const description = body.description ? String(body.description).slice(0, 1000) : null;
+    return this.prisma.rahcomActivity.create({ data: { organizationId, createdById: user.id, performedBy: `${user.firstName} ${user.lastName}`.trim() || user.username, activityDate: this.validDate(body.date), activityType, quantity, description: demoOnly && description ? `${this.demoActivityPrefix} ${description}` : description } });
   }
   async listSystemActivities(user: AuthenticatedUser, systemId: string) {
-    const organizationId = this.organization(user);
-    const system = await this.prisma.rahcomSystem.findFirst({ where: { id: systemId, organizationId }, select: { id: true } });
+    const { organizationId, demoOnly } = await this.authorize(user);
+    const system = await this.prisma.rahcomSystem.findFirst({ where: { id: systemId, organizationId, ...(demoOnly ? { systemCode: { startsWith: this.demoSystemPrefix } } : {}) }, select: { id: true } });
     if (!system) throw new NotFoundException('System not found.');
-    return this.prisma.rahcomActivity.findMany({ where: { organizationId, systemId }, orderBy: [{ activityDate: 'desc' }, { createdAt: 'desc' }] });
+    return this.prisma.rahcomActivity.findMany({ where: { organizationId, systemId, ...(demoOnly ? { description: { startsWith: this.demoActivityPrefix } } : {}) }, orderBy: [{ activityDate: 'desc' }, { createdAt: 'desc' }] });
   }
-  async createSystemActivity(user: AuthenticatedUser, systemId: string, body: Record<string, unknown>) {
-    return this.createVisitRecord(user, this.organization(user), systemId, body);
+  async createSystemActivity(user: AuthenticatedUser, systemId: string, body: CreateRahcomSystemActivityDto) {
+    const { organizationId, demoOnly } = await this.authorize(user, true);
+    return this.createVisitRecord(user, organizationId, systemId, body, demoOnly);
   }
-  private async createVisitRecord(user: AuthenticatedUser, organizationId: string, systemId: string, body: Record<string, unknown>) {
-    const system = await this.prisma.rahcomSystem.findFirst({ where: { id: systemId, organizationId } });
+  private async createVisitRecord(user: AuthenticatedUser, organizationId: string, systemId: string, body: CreateRahcomActivityDto | CreateRahcomSystemActivityDto, demoOnly = false) {
+    const system = await this.prisma.rahcomSystem.findFirst({ where: { id: systemId, organizationId, ...(demoOnly ? { systemCode: { startsWith: this.demoSystemPrefix } } : {}) } });
     if (!system) throw new NotFoundException('System not found.');
     const description = String(body.description ?? '').trim();
     if (!description) throw new BadRequestException('Describe the work performed.');
-    const activityDate = this.validDate(body.date ?? body.activityDate);
+    const activityDate = this.validDate(body.date);
     const optional = (value: unknown, max: number) => { const text = String(value ?? '').trim(); return text ? text.slice(0, max) : null; };
     return this.prisma.rahcomActivity.create({ data: {
       organizationId, createdById: user.id, performedBy: `${user.firstName} ${user.lastName}`.trim() || user.username,
       systemId: system.id, systemNameSnapshot: system.systemName, systemCodeSnapshot: system.systemCode, provinceSnapshot: system.province,
-      activityDate, activityType: 'SYSTEM_VISIT', quantity: 1, description: description.slice(0, 1000),
+      activityDate, activityType: 'SYSTEM_VISIT', quantity: 1, description: demoOnly ? `${this.demoActivityPrefix} ${description}`.slice(0, 1000) : description.slice(0, 1000),
       accompaniedBy: optional(body.accompaniedBy, 200), handedOverTo: optional(body.handedOverTo, 200),
     } });
   }
   async deleteActivity(user: AuthenticatedUser, id: string) {
-    const result = await this.prisma.rahcomActivity.deleteMany({ where: { id, organizationId: this.organization(user) } });
+    const { organizationId, demoOnly } = await this.authorize(user, true);
+    const result = await this.prisma.rahcomActivity.deleteMany({ where: { id, organizationId, ...(demoOnly ? { description: { startsWith: this.demoActivityPrefix } } : {}) } });
     if (!result.count) throw new NotFoundException('Activity not found.');
     return { deleted: true };
   }

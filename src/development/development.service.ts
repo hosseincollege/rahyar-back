@@ -11,6 +11,8 @@ import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { isTestDataModuleKey, seedTestDataModule, TEST_DATA_MODULES } from './test-data';
 import type { TestDataContext } from './test-data/context';
+import { DEMO_RAHCOM_ACTIVITY_PREFIX, DEMO_RAHCOM_SYSTEM_CODE_PREFIX } from './test-data/rahcom';
+import { DEMO_SETTINGS_ACCOUNT_PREFIX, DEMO_SETTINGS_BRANCH_CODES, DEMO_SETTINGS_DEPARTMENT_CODES } from './test-data/settings';
 
 @Injectable()
 export class DevelopmentService {
@@ -86,18 +88,32 @@ export class DevelopmentService {
 
   async getTestDataStatus(actor: AuthenticatedUser) {
     const { organizationId } = await this.requireAdministrator(actor);
-    const runs = await this.prisma.developmentTestDataRun.findMany({ where: { organizationId } });
-    const byModule = new Map(runs.map((run) => [run.moduleKey, run]));
+    const [runSettings, rahcomSystems, rahcomActivities, branches, departments, teams, accounts, preferences] = await Promise.all([
+      this.prisma.developmentTestDataRun.findMany({ where: { organizationId }, select: { moduleKey: true, appliedAt: true } }),
+      this.prisma.rahcomSystem.count({ where: { organizationId, systemCode: { startsWith: DEMO_RAHCOM_SYSTEM_CODE_PREFIX } } }),
+      this.prisma.rahcomActivity.count({ where: { organizationId, description: { startsWith: DEMO_RAHCOM_ACTIVITY_PREFIX } } }),
+      this.prisma.branch.count({ where: { organizationId, code: { in: DEMO_SETTINGS_BRANCH_CODES } } }),
+      this.prisma.department.count({ where: { organizationId, code: { in: DEMO_SETTINGS_DEPARTMENT_CODES } } }),
+      this.prisma.departmentTeam.count({ where: { organizationId, code: 'DEMO-TEAM', department: { code: { in: DEMO_SETTINGS_DEPARTMENT_CODES } } } }),
+      this.prisma.user.count({ where: { username: { startsWith: DEMO_SETTINGS_ACCOUNT_PREFIX }, memberships: { some: { organizationId } } } }),
+      this.prisma.userPreference.count({ where: { user: { username: { startsWith: DEMO_SETTINGS_ACCOUNT_PREFIX }, memberships: { some: { organizationId } } } } }),
+    ]);
+    const byModule = new Map(runSettings.map((run) => [run.moduleKey, run]));
+    const countsByModule: Record<string, Record<string, number>> = {
+      rahcom: { systems: rahcomSystems, activities: rahcomActivities },
+      settings: { branches, departments, teams, accounts, preferences },
+    };
     return {
       modules: TEST_DATA_MODULES.map((moduleKey) => {
         const run = byModule.get(moduleKey);
-        const recordCounts = (run?.recordCounts ?? {}) as Record<string, number>;
+        const recordCounts = countsByModule[moduleKey] ?? {};
+        const totalRecords = Object.values(recordCounts).reduce((total, value) => total + value, 0);
         return {
           moduleKey,
-          applied: Boolean(run),
-          appliedAt: run?.appliedAt.toISOString() ?? null,
+          applied: totalRecords > 0,
+          appliedAt: totalRecords > 0 ? run?.appliedAt.toISOString() ?? null : null,
           recordCounts,
-          totalRecords: Object.values(recordCounts).reduce((total, value) => total + (typeof value === 'number' ? value : 0), 0),
+          totalRecords,
         };
       }),
     };
