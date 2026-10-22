@@ -5,6 +5,7 @@ import type {
   CreateRahcomActivityDto,
   CreateRahcomSystemActivityDto,
   ImportRahcomSystemsDto,
+  RahcomActivitiesQueryDto,
   UpdateRahcomSystemDto,
 } from './dto/rahcom.dto';
 
@@ -128,10 +129,17 @@ export class RahcomService {
     const result = await this.prisma.rahcomSystem.deleteMany({ where: { organizationId, ...(demoOnly ? { systemCode: { startsWith: this.demoSystemPrefix } } : {}), ...(province ? { province } : { id: { in: ids } }) } });
     return { deleted: result.count };
   }
-  async listActivities(user: AuthenticatedUser, date: string) {
+  async listActivities(user: AuthenticatedUser, query: RahcomActivitiesQueryDto) {
     const { organizationId, demoOnly } = await this.authorize(user);
-    const activityDate = this.validDate(date);
-    return this.prisma.rahcomActivity.findMany({ where: { organizationId, activityDate, ...(demoOnly ? { description: { startsWith: this.demoActivityPrefix } } : {}) }, include: { system: { select: { id: true, systemName: true, systemCode: true, province: true } } }, orderBy: { createdAt: 'desc' } });
+    if (!query.date && !query.from && !query.to) throw new BadRequestException('Provide a date or a date range.');
+    if (query.date && (query.from || query.to)) throw new BadRequestException('Use either a single date or a date range.');
+    const activityDate = query.date ? this.validDate(query.date) : undefined;
+    const from = query.from ? this.validDate(query.from) : undefined;
+    const to = query.to ? this.validDate(query.to) : undefined;
+    if (Boolean(from) !== Boolean(to)) throw new BadRequestException('Both from and to dates are required for a range.');
+    if (from && to && from > to) throw new BadRequestException('The start date must be before the end date.');
+    const range = from && to ? { gte: from, lt: new Date(to.getTime() + 86_400_000) } : undefined;
+    return this.prisma.rahcomActivity.findMany({ where: { organizationId, ...(range ? { activityDate: range } : activityDate ? { activityDate } : {}), ...(demoOnly ? { description: { startsWith: this.demoActivityPrefix } } : {}) }, include: { system: { select: { id: true, systemName: true, systemCode: true, province: true } } }, orderBy: [{ activityDate: 'desc' }, { createdAt: 'desc' }] });
   }
   createActivity(user: AuthenticatedUser, body: CreateRahcomActivityDto) {
     return this.createAuthorizedActivity(user, body);

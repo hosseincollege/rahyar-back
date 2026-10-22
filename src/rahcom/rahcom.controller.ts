@@ -50,7 +50,7 @@ export class RahcomController {
   }
   @Get('activities')
   listActivities(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomActivitiesQueryDto) {
-    return this.service.listActivities(user, query.date);
+    return this.service.listActivities(user, query);
   }
   @Post('activities')
   createActivity(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomActivityDto) {
