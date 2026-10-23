@@ -27,7 +27,11 @@ async function createNestApp(expressInstance: Express): Promise<void> {
   const app = await NestFactory.create(
     AppModule,
     new ExpressAdapter(expressInstance),
+    { bodyParser: false },
   );
+
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   app.enableCors({
     origin: (origin, callback) => {

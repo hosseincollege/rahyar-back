@@ -1,13 +1,11 @@
 // backend/src/core/setup/setup.controller.ts
 
-import { Controller, Get, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { Public } from '../auth/decorators/public.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('setup')
 export class SetupController {
-  private readonly logger = new Logger(SetupController.name);
-
   constructor(private readonly prisma: PrismaService) {}
 
   @Public()
@@ -21,8 +19,12 @@ export class SetupController {
         isFirstInstall: userCount === 0,
       };
     } catch (error) {
-      this.logger.error('Unable to read initial setup status from the database', error instanceof Error ? error.stack : undefined);
-      throw new ServiceUnavailableException('وضعیت ثبت‌نام به‌دلیل خطای اتصال پایگاه داده قابل بررسی نیست.');
+      console.error('[setup.status] database error', error);
+
+      return {
+        hasUsers: true,
+        isFirstInstall: false,
+      };
     }
   }
 }

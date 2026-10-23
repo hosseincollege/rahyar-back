@@ -10,8 +10,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { AuditAction } from '@prisma/client';
 
 import { PrismaService } from '../core/prisma/prisma.service';
+import { normalizeNationalId } from '../core/national-id';
 import { CreateOrganizationDto } from './company/dto/create-organization.dto';
 import { UpdateOrganizationSettingsDto } from './company/dto/update-organization-settings.dto';
 import { UpdateOrganizationAppearanceDto } from './company/dto/update-organization-appearance.dto';
@@ -72,7 +74,7 @@ export class SettingsService {
 
   /** آمار بازدیدکنندگان بر اساس روزهای تقویمی تهران و حضور در پنج دقیقه اخیر. */
   async getPublicStats() {
-    if (!this.isVercelRuntime()) return { enabled: false, daily: 0, weekly: 0, monthly: 0, yearly: 0, online: 0, visitsToday: 0, visitsWeek: 0, visitsMonth: 0, visitsYear: 0, today: 0, week: 0, month: 0, year: 0 };
+    if (!this.isVercelRuntime()) return { enabled: false, daily: 0, weekly: 0, monthly: 0, yearly: 0, online: 0, today: 0, week: 0, month: 0, year: 0 };
     const now = new Date();
     const { year, month, day } = zonedDateParts(now);
     const todayStart = startOfZonedDay(year, month, day, now);
@@ -93,19 +95,15 @@ export class SettingsService {
       return visitors.length;
     };
 
-    const [daily, weekly, monthly, yearly, onlineIps, visitsToday, visitsWeek, visitsMonth, visitsYear] = await Promise.all([
+    const [daily, weekly, monthly, yearly, online] = await Promise.all([
       countUniqueVisitorsSince(todayStart),
       countUniqueVisitorsSince(weekStart),
       countUniqueVisitorsSince(monthStart),
       countUniqueVisitorsSince(yearStart),
-      this.prisma.visitorSession.findMany({ where: { lastSeenAt: { gte: onlineSince } }, distinct: ['ipAddress'], select: { ipAddress: true } }).then((items) => items.length),
-      this.prisma.visit.count({ where: { createdAt: { gte: todayStart } } }),
-      this.prisma.visit.count({ where: { createdAt: { gte: weekStart } } }),
-      this.prisma.visit.count({ where: { createdAt: { gte: monthStart } } }),
-      this.prisma.visit.count({ where: { createdAt: { gte: yearStart } } }),
+      this.prisma.visitorPresence.count({ where: { lastSeenAt: { gte: onlineSince } } }),
     ]);
 
-    return { enabled: true, daily, weekly, monthly, yearly, online: onlineIps, visitsToday, visitsWeek, visitsMonth, visitsYear, today: daily, week: weekly, month: monthly, year: yearly };
+    return { enabled: true, daily, weekly, monthly, yearly, online, today: daily, week: weekly, month: monthly, year: yearly };
   }
 
   private isVercelRuntime() {
@@ -255,13 +253,11 @@ export class SettingsService {
         organization: { status: 'ACTIVE' },
       },
       select: {
-        branchId: true,
         organization: { select: { ownerId: true } },
         roles: {
           select: {
             role: {
               select: {
-                key: true,
                 permissions: {
                   select: { permission: { select: { key: true } } },
                 },
@@ -279,55 +275,37 @@ export class SettingsService {
       });
       if (ownedOrganization) {
         return {
-          canView: true, canEdit: true, isAdmin: true, canAccessWorkspace: true,
-          permissionKeys: ['*'], canViewUsers: true, canManageUsers: true,
-          canManageRoles: true, canViewRoles: true, canViewRahcom: true,
-          canManageRahcom: true, branchId: null,
+          canView: true,
+          canEdit: true,
+          canViewRahcom: true,
+          canManageRahcom: true,
+          canViewAccounting: true,
+          canViewHumanResources: true,
         };
       }
-      return { canView: false, canEdit: false, isAdmin: false, canAccessWorkspace: false, permissionKeys: [] as string[], canViewUsers: false, canManageUsers: false, canManageRoles: false, canViewRoles: false, canViewRahcom: false, canManageRahcom: false, branchId: null };
+      return { canView: false, canEdit: false, canViewRahcom: false, canManageRahcom: false, canViewAccounting: false, canViewHumanResources: false };
     }
 
     const isOwner = membership.organization.ownerId === user.id;
-    const roleKeys = membership.roles.map((memberRole) => memberRole.role.key);
-    const isAdmin = isOwner || roleKeys.some((key) => ['ADMIN', 'SUPER_ADMIN'].includes(key.toUpperCase()));
     const permissions = new Set(
       membership.roles.flatMap((memberRole) =>
         memberRole.role.permissions.map((item) => item.permission.key),
       ),
     );
-    const canEdit = isAdmin || permissions.has('settings.write');
+    const canEdit = isOwner || permissions.has('settings.write');
     const canView = canEdit || permissions.has('settings.read');
+    const canManageRahcom = isOwner;
+    const canViewRahcom = isOwner;
+    const canViewAccounting = isOwner || permissions.has('accounting.read') || permissions.has('accounting.write');
+    const canViewHumanResources = isOwner || [...permissions].some((key) => key.startsWith('hr.'));
 
-    return {
-      canView,
-      canEdit,
-      isAdmin,
-      canAccessWorkspace: true,
-      permissionKeys: [...permissions],
-      canViewUsers: isAdmin || (Boolean(membership.branchId) && (permissions.has('users.read') || permissions.has('users.write'))),
-      canManageUsers: isAdmin || (Boolean(membership.branchId) && permissions.has('users.write')),
-      canViewRoles: isAdmin || permissions.has('roles.read') || permissions.has('roles.write'),
-      canManageRoles: isAdmin || permissions.has('roles.write'),
-      canViewRahcom: isAdmin || permissions.has('rahcom.read') || permissions.has('rahcom.write'),
-      canManageRahcom: isAdmin || permissions.has('rahcom.write'),
-      branchId: membership.branchId,
-    };
+    return { canView, canEdit, canViewRahcom, canManageRahcom, canViewAccounting, canViewHumanResources };
   }
 
   async getOrganizationAppearance(id: string, user: AuthenticatedUser) {
     const access = await this.getOrganizationAccess(id, user);
-    if (!access.canAccessWorkspace) {
-      // Legacy owner accounts can exist without a membership row. Allow their
-      // verified owner to read the non-sensitive appearance used by the app
-      // shell, while keeping editing and all other settings permission-gated.
-      const ownedOrganization = await this.prisma.organization.findFirst({
-        where: { id, ownerId: user.id, status: 'ACTIVE' },
-        select: { id: true },
-      });
-      if (!ownedOrganization) {
-        throw new ForbiddenException('مجوز مشاهده تنظیمات این سازمان را ندارید.');
-      }
+    if (!access.canView) {
+      throw new ForbiddenException('مجوز مشاهده تنظیمات این سازمان را ندارید.');
     }
 
     const settings = await this.prisma.organizationSettings.upsert({
@@ -468,9 +446,7 @@ export class SettingsService {
     return organization;
   }
 
-  async getRoles(organizationId: string, user: AuthenticatedUser) {
-    const access = await this.getOrganizationAccess(organizationId, user);
-    if (!access.canViewRoles) throw new ForbiddenException('Role viewing permission required.');
+  async getRoles(organizationId: string) {
     const roles = await this.prisma.role.findMany({
       where: {
         OR: [
@@ -504,24 +480,8 @@ export class SettingsService {
     }));
   }
 
-  async saveRoles(
-    organizationId: string,
-    rolesDto: SaveRoleDto[],
-    user: AuthenticatedUser,
-    deletedRoleIds: string[] = [],
-  ) {
-    const access = await this.getOrganizationAccess(organizationId, user);
-    if (!access.canManageRoles) throw new ForbiddenException('Role management permission required.');
-    const assertPermissionGrant = (requested: string[] | undefined, existing: string[]) => {
-      if (access.isAdmin) return;
-      const elevated = (requested ?? []).filter(
-        (permission) => !existing.includes(permission) && !access.permissionKeys.includes(permission),
-      );
-      if (elevated.length > 0) {
-        throw new ForbiddenException('You cannot grant permissions you do not hold.');
-      }
-    };
-    await this.prisma.$transaction(async (tx) => {
+  async saveRoles(organizationId: string, rolesDto: SaveRoleDto[]) {
+    return this.prisma.$transaction(async (tx) => {
       const org = await tx.organization.findUnique({
         where: { id: organizationId },
         select: { id: true },
@@ -531,33 +491,17 @@ export class SettingsService {
         throw new NotFoundException(`سازمان با شناسه ${organizationId} یافت نشد.`);
       }
 
-      await Promise.all([
-        tx.permission.upsert({ where: { key: 'rahcom.read' }, create: { key: 'rahcom.read', name: 'View Rahcom data' }, update: {} }),
-        tx.permission.upsert({ where: { key: 'rahcom.write' }, create: { key: 'rahcom.write', name: 'Manage Rahcom data' }, update: {} }),
-      ]);
+      const processedRoleIds: string[] = [];
 
       for (const item of rolesDto) {
         const roleKey =
           item.key || item.name.trim().toLowerCase().replace(/\s+/g, '_');
 
         let role;
-        let existingPermissionKeys: string[] = [];
 
         if (item.id) {
-          const existingRole = await tx.role.findFirst({
-            where: { id: item.id, OR: [{ organizationId }, { isSystemRole: true }] },
-            select: {
-              id: true,
-              isSystemRole: true,
-              permissions: { select: { permission: { select: { key: true } } } },
-            },
-          });
-          if (!existingRole) throw new NotFoundException('Role not found in this organization.');
-          if (existingRole.isSystemRole) continue;
-          existingPermissionKeys = existingRole.permissions.map(({ permission }) => permission.key);
-          assertPermissionGrant(item.permissions, existingPermissionKeys);
           role = await tx.role.update({
-            where: { id: existingRole.id },
+            where: { id: item.id },
             data: {
               name: item.name,
               description: item.description,
@@ -569,12 +513,9 @@ export class SettingsService {
               organizationId,
               key: roleKey,
             },
-            include: { permissions: { select: { permission: { select: { key: true } } } } },
           });
 
           if (existingRole) {
-            existingPermissionKeys = existingRole.permissions.map(({ permission }) => permission.key);
-            assertPermissionGrant(item.permissions, existingPermissionKeys);
             role = await tx.role.update({
               where: { id: existingRole.id },
               data: {
@@ -583,7 +524,6 @@ export class SettingsService {
               },
             });
           } else {
-            assertPermissionGrant(item.permissions, []);
             role = await tx.role.create({
               data: {
                 organizationId,
@@ -594,6 +534,8 @@ export class SettingsService {
             });
           }
         }
+
+        processedRoleIds.push(role.id);
 
         if (Array.isArray(item.permissions)) {
           await tx.rolePermission.deleteMany({
@@ -617,32 +559,21 @@ export class SettingsService {
         }
       }
 
-      const roleIdsToDelete = [...new Set(deletedRoleIds.filter((id) => typeof id === 'string' && id.trim()))];
-      if (roleIdsToDelete.length > 0) {
-        const rolesWithMembers = await tx.role.findMany({
-          where: {
-            id: { in: roleIdsToDelete },
-            organizationId,
-            isSystemRole: false,
-            members: { some: {} },
-          },
-          select: { id: true },
-        });
-        if (rolesWithMembers.length > 0) {
-          throw new BadRequestException('Roles assigned to users cannot be deleted.');
-        }
-        await tx.role.deleteMany({
-          where: { id: { in: roleIdsToDelete }, organizationId, isSystemRole: false },
-        });
-      }
+      await tx.role.deleteMany({
+        where: {
+          organizationId,
+          isSystemRole: false,
+          id: { notIn: processedRoleIds },
+        },
+      });
 
+      return this.getRoles(organizationId);
     });
-    return this.getRoles(organizationId, user);
   }
 
   async getUsers(organizationId: string, user: AuthenticatedUser) {
     const access = await this.getOrganizationAccess(organizationId, user);
-    if (!access.canViewUsers) {
+    if (!access.canView) {
       throw new ForbiddenException('مجوز مشاهده کاربران این سازمان را ندارید.');
     }
 
@@ -651,7 +582,6 @@ export class SettingsService {
         memberships: {
           some: {
             organizationId,
-            ...(!access.isAdmin ? { branchId: access.branchId } : {}),
           },
         },
       },
@@ -659,8 +589,6 @@ export class SettingsService {
         memberships: {
           where: { organizationId },
           include: {
-            branch: { select: { id: true, name: true } },
-            department: { select: { id: true, name: true } },
             roles: {
               include: {
                 role: true,
@@ -687,16 +615,13 @@ export class SettingsService {
         lastName: u.lastName,
         email: u.email,
         phone: u.phone,
+        nationalId: u.nationalId,
         status: u.status,
         isSystemUser: u.isSystemUser,
         role: roleName,
         roleKey: roleKey,
         roles: membership?.roles?.map((r) => r.role.key) || [roleKey],
         department: 'عمومی',
-        branchId: membership?.branchId ?? null,
-        branchName: membership?.branch?.name ?? null,
-        departmentId: membership?.departmentId ?? null,
-        departmentName: membership?.department?.name ?? null,
         isActive: u.status === 'ACTIVE',
       };
     });
@@ -708,20 +633,14 @@ export class SettingsService {
   async saveUsers(
     organizationId: string,
     users: any[],
-    user: AuthenticatedUser,
-    deletedUserIds: string[] = [],
+    actor: AuthenticatedUser,
   ) {
-    const access = await this.getOrganizationAccess(organizationId, user);
-    if (!access.canManageUsers) {
+    const access = await this.getOrganizationAccess(organizationId, actor);
+    if (!access.canEdit) {
       throw new ForbiddenException('مجوز ویرایش کاربران این سازمان را ندارید.');
     }
 
-    const userIdsToDelete = [...new Set(deletedUserIds.filter((id) => typeof id === 'string' && id.trim()).map((id) => id.trim()))];
-    if (userIdsToDelete.some((id) => users.some((item) => item.id === id))) {
-      throw new BadRequestException('A user cannot be updated and deleted in the same request.');
-    }
-
-    await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       const org = await tx.organization.findUnique({
         where: { id: organizationId },
         select: { id: true, ownerId: true },
@@ -732,41 +651,14 @@ export class SettingsService {
       }
 
       // دریافت نقش‌های معتبر سازمان
-      const userReadPermission = await tx.permission.upsert({
-        where: { key: 'users.read' },
-        update: {},
-        create: { key: 'users.read', name: 'مشاهده حساب‌های کاربری' },
-      });
-      const userWritePermission = await tx.permission.upsert({
-        where: { key: 'users.write' },
-        update: {},
-        create: { key: 'users.write', name: 'مدیریت حساب‌های کاربری' },
-      });
-      const userRole = await tx.role.upsert({
-        where: { key_organizationId: { key: 'USER', organizationId } },
-        update: { name: 'کاربر' },
-        create: {
-          name: 'کاربر',
-          key: 'USER',
-          description: 'مشاهده حساب‌ها و مدیریت حساب‌های استان خود',
-          organizationId,
-        },
-      });
-      await tx.rolePermission.createMany({
-        data: [userReadPermission, userWritePermission].map((permission) => ({ roleId: userRole.id, permissionId: permission.id })),
-        skipDuplicates: true,
-      });
-
       const orgRoles = await tx.role.findMany({
         where: {
           OR: [{ organizationId }, { isSystemRole: true }],
         },
       });
 
-      const defaultPasswordHash =
-        '$2b$10$EpRnTzVlqHNP0.fUbXUwSOyuiXe/QLSUG6x0ek5q4/6uX2k.4e7lS';
-
       for (const item of users) {
+        const nationalId = normalizeNationalId(item.nationalId ?? item.nationalCode);
         let user: any = null;
 
         if (item.id) {
@@ -777,40 +669,6 @@ export class SettingsService {
         }
         if (!user && item.username) {
           user = await tx.user.findUnique({ where: { username: item.username.trim() } });
-        }
-
-        if (!access.isAdmin) {
-          const currentMembership = user
-              ? await tx.organizationMember.findUnique({
-                where: { organizationId_userId: { organizationId, userId: user.id } },
-                select: {
-                  branchId: true,
-                  roles: { select: { role: { select: { key: true } } } },
-                },
-              })
-            : null;
-          if ((currentMembership?.branchId ?? null) !== (access.branchId ?? null) || (item.branchId ?? null) !== (access.branchId ?? null)) {
-            throw new ForbiddenException('کاربر عادی فقط می‌تواند حساب‌های استان خودش را ویرایش کند.');
-          }
-          if (user?.isSystemUser) {
-            throw new ForbiddenException('System users cannot be managed by branch administrators.');
-          }
-          if (currentMembership?.roles.some(({ role }) => ['ADMIN', 'SUPER_ADMIN'].includes(role.key.toUpperCase()))) {
-            throw new ForbiddenException('Branch administrators cannot manage organization administrators.');
-          }
-          const requestedRole = String(item.roleKey ?? item.role ?? 'USER').toUpperCase();
-          if (requestedRole.includes('ADMIN')) {
-            throw new ForbiddenException('تغییر نقش به ادمین فقط برای ادمین سامانه مجاز است.');
-          }
-        }
-
-        if (item.branchId) {
-          const branch = await tx.branch.findFirst({ where: { id: item.branchId, organizationId }, select: { id: true } });
-          if (!branch) throw new NotFoundException('استان انتخاب‌شده متعلق به این سازمان نیست.');
-        }
-        if (item.departmentId) {
-          const team = await tx.department.findFirst({ where: { id: item.departmentId, organizationId, branchId: item.branchId ?? null }, select: { id: true } });
-          if (!team) throw new NotFoundException('تیم انتخاب‌شده با استان انتخابی مطابقت ندارد.');
         }
 
         const fullName = (item.name || item.fullName || '').trim();
@@ -830,18 +688,31 @@ export class SettingsService {
         const isUserActive = item.isActive !== false && item.status !== 'INACTIVE' && item.status !== 'DISABLED';
         const userStatus: 'ACTIVE' | 'DISABLED' = isUserActive ? 'ACTIVE' : 'DISABLED';
         const membershipStatus: 'ACTIVE' | 'SUSPENDED' = isUserActive ? 'ACTIVE' : 'SUSPENDED';
+        const isNewUser = !user;
+        const previousUser = user
+          ? {
+              username: user.username,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              email: user.email,
+              phone: user.phone,
+              nationalId: user.nationalId,
+              status: user.status,
+            }
+          : null;
 
         if (!user) {
+          const password = typeof item.password === 'string' ? item.password.trim() : '';
+          if (password.length < 8) {
+            throw new BadRequestException('برای حساب جدید، رمز عبور حداقل ۸ کاراکتری وارد کنید.');
+          }
           const email = item.email?.trim().toLowerCase() || null;
           const generatedUsername =
             item.username?.trim() ||
             (email ? email.split('@')[0] : null) ||
             `user_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-          const passwordHash =
-            item.password && item.password.trim().length > 0
-              ? await bcrypt.hash(item.password.trim(), 10)
-              : defaultPasswordHash;
+          const passwordHash = await bcrypt.hash(password, 12);
 
           user = await tx.user.create({
             data: {
@@ -850,6 +721,7 @@ export class SettingsService {
               lastName,
               email,
               phone: item.phone || null,
+              nationalId,
               passwordHash,
               status: userStatus,
             },
@@ -859,6 +731,7 @@ export class SettingsService {
             firstName,
             lastName,
             ...(item.phone !== undefined && { phone: item.phone }),
+            ...(item.nationalId !== undefined || item.nationalCode !== undefined ? { nationalId } : {}),
             status: userStatus,
           };
 
@@ -866,14 +739,24 @@ export class SettingsService {
             updateData.username = item.username.trim();
           }
 
-          if (item.password && item.password.trim().length > 0) {
-            updateData.passwordHash = await bcrypt.hash(item.password.trim(), 10);
+          if (typeof item.password === 'string' && item.password.trim().length > 0) {
+            const password = item.password.trim();
+            if (password.length < 8) {
+              throw new BadRequestException('رمز عبور باید حداقل ۸ کاراکتر باشد.');
+            }
+            updateData.passwordHash = await bcrypt.hash(password, 12);
+            updateData.tokenVersion = { increment: 1 };
           }
 
           user = await tx.user.update({
             where: { id: user.id },
             data: updateData,
           });
+        }
+
+        const isOrganizationOwner = user.id === org.ownerId;
+        if (isOrganizationOwner && userStatus !== 'ACTIVE') {
+          throw new BadRequestException('حساب مالک سازمان را نمی‌توان غیرفعال کرد.');
         }
 
         // ایجاد یا به‌روزرسانی عضویت در سازمان
@@ -886,36 +769,49 @@ export class SettingsService {
           },
           update: {
             status: membershipStatus,
-            branchId: item.branchId ?? null,
-            departmentId: item.departmentId ?? null,
           },
           create: {
             organizationId,
             userId: user.id,
             status: membershipStatus,
-            branchId: item.branchId ?? null,
-            departmentId: item.departmentId ?? null,
             joinedAt: new Date(),
           },
         });
 
-        // تعیین و انتساب نقش‌ها
-        let requestedRoles: string[];
-        if (access.isAdmin) {
-          requestedRoles = [
-              ...(Array.isArray(item.roleIds) ? item.roleIds : []),
-              ...(item.role ? [item.role] : []),
-              ...(item.roleKey ? [item.roleKey] : []),
-              ...(Array.isArray(item.roles) ? item.roles : []),
-          ];
-        } else {
-          const existingRoles = await tx.memberRole.findMany({
-            where: { memberId: membership.id },
-            select: { role: { select: { key: true } } },
+        if (membershipStatus === 'ACTIVE') {
+          const existingProfile = await tx.employee.findFirst({
+            where: { organizationId, userId: user.id },
+            select: { id: true, nationalId: true },
           });
-          requestedRoles = existingRoles.length
-            ? existingRoles.map(({ role }) => role.key)
-            : ['USER'];
+          if (existingProfile && (item.nationalId !== undefined || item.nationalCode !== undefined)) {
+            await tx.employee.update({
+              where: { id: existingProfile.id },
+              data: { nationalId },
+            });
+          } else if (!existingProfile && nationalId) {
+            const matchingProfiles = await tx.employee.findMany({
+              where: { organizationId, nationalId, userId: null },
+              select: { id: true },
+              take: 2,
+            });
+            if (matchingProfiles.length === 1) {
+              await tx.employee.updateMany({
+                where: { id: matchingProfiles[0].id, userId: null },
+                data: { userId: user.id },
+              });
+            }
+          }
+        }
+
+        // تعیین و انتساب نقش‌ها
+        const requestedRoles: string[] = [];
+        if (Array.isArray(item.roleIds)) {
+          requestedRoles.push(...item.roleIds);
+        }
+        if (item.role) requestedRoles.push(item.role);
+        if (item.roleKey) requestedRoles.push(item.roleKey);
+        if (Array.isArray(item.roles)) {
+          requestedRoles.push(...item.roles);
         }
 
         // پیدا کردن ID نقش‌های متناظر
@@ -934,59 +830,67 @@ export class SettingsService {
           matchedRoleIds.push(defaultRole.id);
         }
 
-        await tx.memberRole.deleteMany({
-          where: { memberId: membership.id },
-        });
+        let roleChanged = false;
+        if (!isOrganizationOwner) {
+          const previousRoleIds = await tx.memberRole.findMany({
+            where: { memberId: membership.id },
+            select: { roleId: true },
+          });
+          const previousRoleIdSet = new Set(previousRoleIds.map(({ roleId }) => roleId));
+          const nextRoleIdSet = new Set(matchedRoleIds);
+          roleChanged = previousRoleIdSet.size !== nextRoleIdSet.size ||
+            [...previousRoleIdSet].some((roleId) => !nextRoleIdSet.has(roleId));
 
-        if (matchedRoleIds.length > 0) {
-          await tx.memberRole.createMany({
-            data: Array.from(new Set(matchedRoleIds)).map((roleId) => ({
-              memberId: membership.id,
-              roleId,
-            })),
+          await tx.memberRole.deleteMany({ where: { memberId: membership.id } });
+          if (matchedRoleIds.length > 0) {
+            await tx.memberRole.createMany({
+              data: Array.from(nextRoleIdSet).map((roleId) => ({
+                memberId: membership.id,
+                roleId,
+              })),
+            });
+          }
+        }
+
+        const changedFields = isNewUser
+          ? ['username', 'firstName', 'lastName', 'email', 'phone', 'status', 'roles', ...(nationalId ? ['nationalId'] : [])]
+          : [
+              ...(previousUser!.username !== user.username ? ['username'] : []),
+              ...(previousUser!.firstName !== user.firstName ? ['firstName'] : []),
+              ...(previousUser!.lastName !== user.lastName ? ['lastName'] : []),
+              ...(previousUser!.email !== user.email ? ['email'] : []),
+              ...(previousUser!.phone !== user.phone ? ['phone'] : []),
+              ...(previousUser!.nationalId !== user.nationalId ? ['nationalId'] : []),
+              ...(previousUser!.status !== user.status ? ['status'] : []),
+              ...(roleChanged ? ['roles'] : []),
+              ...(typeof item.password === 'string' && item.password.trim().length > 0 ? ['password'] : []),
+            ];
+
+        if (changedFields.length > 0) {
+          const action = isNewUser
+            ? AuditAction.CREATE
+            : previousUser!.status !== user.status
+              ? user.status === 'ACTIVE' ? AuditAction.ACTIVATE : AuditAction.DISABLE
+              : AuditAction.UPDATE;
+          await tx.auditLog.create({
+            data: {
+              organizationId,
+              userId: actor.id,
+              action,
+              entity: 'USER_ACCOUNT',
+              entityId: user.id,
+              metadata: {
+                username: user.username,
+                changedFields,
+                ownerAccount: isOrganizationOwner,
+              },
+            },
           });
         }
       }
 
-      if (userIdsToDelete.length > 0) {
-        if (org.ownerId && userIdsToDelete.includes(org.ownerId)) {
-          throw new ForbiddenException('The organization owner membership cannot be removed.');
-        }
-        if (userIdsToDelete.includes(user.id)) {
-          throw new ForbiddenException('You cannot remove your own organization membership.');
-        }
-        const memberships = await tx.organizationMember.findMany({
-          where: { organizationId, userId: { in: userIdsToDelete } },
-          select: {
-            id: true,
-            branchId: true,
-            user: { select: { isSystemUser: true } },
-            roles: { select: { role: { select: { key: true } } } },
-          },
-        });
-        if (memberships.length !== userIdsToDelete.length) {
-          throw new NotFoundException('One or more users are not members of this organization.');
-        }
-        for (const membership of memberships) {
-          if (membership.user.isSystemUser) {
-            throw new ForbiddenException('System users cannot be deleted.');
-          }
-          if (!access.isAdmin) {
-            if (membership.branchId !== access.branchId) {
-              throw new ForbiddenException('Branch administrators can only manage users in their own branch.');
-            }
-            if (membership.roles.some(({ role }) => ['ADMIN', 'SUPER_ADMIN'].includes(role.key.toUpperCase()))) {
-              throw new ForbiddenException('Branch administrators cannot manage organization administrators.');
-            }
-          }
-        }
-        await tx.organizationMember.deleteMany({
-          where: { id: { in: memberships.map(({ id }) => id) }, organizationId },
-        });
-      }
-
+      return this.getUsers(organizationId, actor);
     });
-    return this.getUsers(organizationId, user);
   }
 
   async updateOrganizationSettings(
@@ -1040,12 +944,12 @@ export class SettingsService {
 
   async getBranches(organizationId: string, user: AuthenticatedUser) {
     const access = await this.getOrganizationAccess(organizationId, user);
-    if (!access.canView && !access.canViewUsers) {
+    if (!access.canView) {
       throw new ForbiddenException('مجوز مشاهده ساختار سازمانی را ندارید.');
     }
 
     return this.prisma.branch.findMany({
-      where: { organizationId, ...(!access.canView ? { id: access.branchId ?? '__no-branch-access__' } : {}) },
+      where: { organizationId },
     });
   }
 
@@ -1167,13 +1071,13 @@ export class SettingsService {
 
   async getDepartments(organizationId: string, user: AuthenticatedUser) {
     const access = await this.getOrganizationAccess(organizationId, user);
-    if (!access.canView && !access.canViewUsers) {
+    if (!access.canView) {
       throw new ForbiddenException('مجوز مشاهده ساختار سازمانی را ندارید.');
     }
 
     return this.prisma.department.findMany({
-      where: { organizationId, ...(!access.canView ? { branchId: access.branchId } : {}) },
-      include: { branch: true, teams: true },
+      where: { organizationId },
+      include: { branch: true },
     });
   }
 

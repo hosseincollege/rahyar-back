@@ -3,6 +3,8 @@ model User {
   username                  String                           @unique
   email                     String?                          @unique
   phone                     String?                          @unique
+  nationalId                String?
+  tokenVersion              Int                              @default(0)
   firstName                 String
   lastName                  String
   passwordHash              String
@@ -14,7 +16,7 @@ model User {
   updatedAt                 DateTime                         @updatedAt
   receivedInvoicePayments   AccountingInvoicePayment[]       @relation("AccountingPaymentReceiver")
   accountingStatusActions   AccountingInvoiceStatusHistory[] @relation("AccountingStatusActor")
-  createdAccountingVouchers AccountingVoucher[]              @relation("AccountingVoucherCreator")
+  createdAccountingVouchers AccountingVoucher[] @relation("AccountingVoucherCreator")
   createdAccountingInvoices AccountingInvoice[]              @relation("AccountingInvoiceCreator")
   createdCodes              ActivationCode[]                 @relation("ActivationCodeCreator")
   auditLogs                 AuditLog[]
@@ -41,25 +43,36 @@ model User {
 
   @@index([status])
   @@index([lastLoginAt])
+  @@index([nationalId])
   @@map("users")
 }
 
 model UserPreference {
-  id              String   @id @default(cuid())
-  userId          String   @unique
-  locale          String   @default("fa")
-  accentColor     String   @default("blue")
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  locale        String   @default("fa")
+  accentColor   String   @default("blue")
   lightContrast   String   @default("balanced")
   darkContrast    String   @default("balanced")
   lightBrightness String   @default("balanced")
   darkBrightness  String   @default("balanced")
-  workspaceMode   String   @default("FORM")
-  calendar        String   @default("persian")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceMode  String   @default("FORM")
+  calendar      String   @default("persian")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_preferences")
+}
+
+model AuthLoginAttempt {
+  keyHash        String   @id
+  attempts       Int      @default(0)
+  windowStartedAt DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([windowStartedAt])
+  @@map("auth_login_attempts")
 }
 
 enum UserStatus {

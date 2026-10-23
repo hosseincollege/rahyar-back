@@ -1,19 +1,29 @@
 // backend/src/core/auth/auth.service.ts
 
 import {
-  ConflictException,
   ForbiddenException,
+  ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { createHmac } from 'node:crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { normalizeNationalId } from '../national-id';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { UpdateUserPreferencesDto } from './dto/update-user-preferences.dto';
 import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
+
+const LOGIN_LIMIT = 10;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_RATE_CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000;
+let lastLoginRateCleanupAt = 0;
 
 type AuthUser = {
   id: string;
@@ -22,8 +32,10 @@ type AuthUser = {
   phone: string | null;
   firstName: string;
   lastName: string;
+  avatarUrl: string | null;
   status: string;
   isSystemUser: boolean;
+  tokenVersion: number;
 };
 
 @Injectable()
@@ -31,6 +43,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -48,29 +61,27 @@ export class AuthService {
       throw new ConflictException('کاربری با این مشخصات قبلاً ثبت شده است');
     }
 
-    const isFirstUser = (await this.prisma.user.count()) === 0;
-    if (!isFirstUser) {
-      throw new ForbiddenException('Public registration is disabled.');
-    }
-    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const { user, organizationId } = await this.prisma.$transaction(async (tx) => {
+      if (await tx.user.count() > 0) {
+        throw new ForbiddenException('ثبت‌نام عمومی بسته است؛ حساب کاربری را مالک سامانه ایجاد می‌کند.');
+      }
 
-    const user = await this.prisma.user.create({
-      data: {
-        username: dto.username,
-        email: dto.email ?? null,
-        phone: dto.phone ?? null,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        passwordHash,
-        status: isFirstUser ? 'ACTIVE' : 'INVITED',
-        isSystemUser: isFirstUser,
-      },
-    });
+      const passwordHash = await bcrypt.hash(dto.password, 12);
+      const user = await tx.user.create({
+        data: {
+          username: dto.username,
+          email: dto.email ?? null,
+          phone: dto.phone ?? null,
+          nationalId: normalizeNationalId(dto.nationalCode),
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          passwordHash,
+          status: 'ACTIVE',
+          isSystemUser: true,
+        },
+      });
 
-    let organizationId: string | null = null;
-
-    if (isFirstUser) {
-      const organization = await this.prisma.organization.create({
+      const organization = await tx.organization.create({
         data: {
           name: `${user.firstName} ${user.lastName}`.trim(),
           slug: `${user.username}-${user.id}`,
@@ -79,7 +90,7 @@ export class AuthService {
         },
       });
 
-      const membership = await this.prisma.organizationMember.create({
+      const membership = await tx.organizationMember.create({
         data: {
           userId: user.id,
           organizationId: organization.id,
@@ -87,7 +98,7 @@ export class AuthService {
         },
       });
 
-      const role = await this.prisma.role.create({
+      const role = await tx.role.create({
         data: {
           name: 'Super Admin',
           key: 'SUPER_ADMIN',
@@ -98,20 +109,22 @@ export class AuthService {
         },
       });
 
-      await this.prisma.memberRole.create({
+      await tx.memberRole.create({
         data: {
           memberId: membership.id,
           roleId: role.id,
         },
       });
 
-      organizationId = organization.id;
-    }
-
+      return { user, organizationId: organization.id };
+    }, { isolationLevel: 'Serializable' });
     return this.createAuthResponse(user, organizationId);
   }
 
   async login(dto: LoginDto) {
+    const keyHash = this.getLoginRateLimitKey(dto.identifier);
+    await this.ensureLoginAllowed(keyHash);
+
     const user = await this.prisma.user.findFirst({
       where: {
         OR: [
@@ -122,18 +135,16 @@ export class AuthService {
       },
     });
 
-    if (!user || !user.passwordHash) {
-      throw new UnauthorizedException('کاربر یا رمز عبور نادرست است');
+    const passwordIsValid = user?.passwordHash
+      ? await bcrypt.compare(dto.password, user.passwordHash)
+      : await this.compareAgainstDummyHash(dto.password);
+
+    if (!user || !passwordIsValid || user.status !== 'ACTIVE') {
+      await this.recordLoginFailure(keyHash);
+      throw new UnauthorizedException('\u06a9\u0627\u0631\u0628\u0631 \u06cc\u0627 \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0646\u0627\u062f\u0631\u0633\u062a \u0627\u0633\u062a.');
     }
 
-    const passwordIsValid = await bcrypt.compare(
-      dto.password,
-      user.passwordHash,
-    );
-
-    if (!passwordIsValid || user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('کاربر یا رمز عبور نادرست است');
-    }
+    await this.prisma.authLoginAttempt.deleteMany({ where: { keyHash } });
 
     const membership = await this.prisma.organizationMember.findFirst({
       where: {
@@ -145,15 +156,63 @@ export class AuthService {
       select: { organizationId: true },
     });
 
-    const ownedOrganization = membership
-      ? null
-      : await this.prisma.organization.findFirst({
-          where: { ownerId: user.id, status: 'ACTIVE' },
-          orderBy: { createdAt: 'asc' },
-          select: { id: true },
-        });
+    return this.createAuthResponse(user, membership?.organizationId ?? null);
+  }
 
-    return this.createAuthResponse(user, membership?.organizationId ?? ownedOrganization?.id ?? null);
+  private dummyPasswordHash: Promise<string> | null = null;
+
+  private async compareAgainstDummyHash(password: string): Promise<boolean> {
+    this.dummyPasswordHash ??= bcrypt.hash('not-a-real-erp-account-password', 12);
+    return bcrypt.compare(password, await this.dummyPasswordHash);
+  }
+
+  private getLoginRateLimitKey(identifier: string): string {
+    const secret = this.configService.get<string>('JWT_SECRET') ?? process.env.JWT_SECRET;
+    if (!secret) throw new Error('JWT_SECRET is required to protect login attempt keys.');
+    const normalizedIdentifier = identifier.trim().normalize('NFKC').toLocaleLowerCase('en-US');
+    return createHmac('sha256', secret).update(normalizedIdentifier).digest('hex');
+  }
+
+  private async ensureLoginAllowed(keyHash: string): Promise<void> {
+    const bucket = await this.prisma.authLoginAttempt.findUnique({ where: { keyHash } });
+    if (!bucket) return;
+    const expired = Date.now() - bucket.windowStartedAt.getTime() >= LOGIN_WINDOW_MS;
+    if (!expired && bucket.attempts >= LOGIN_LIMIT) {
+      throw new HttpException('AUTH_RATE_LIMITED', HttpStatus.TOO_MANY_REQUESTS);
+    }
+  }
+
+  private async recordLoginFailure(keyHash: string): Promise<void> {
+    const now = new Date();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const bucket = await tx.authLoginAttempt.findUnique({ where: { keyHash } });
+          if (!bucket) {
+            await tx.authLoginAttempt.create({ data: { keyHash, attempts: 1, windowStartedAt: now } });
+          } else if (now.getTime() - bucket.windowStartedAt.getTime() >= LOGIN_WINDOW_MS) {
+            await tx.authLoginAttempt.update({ where: { keyHash }, data: { attempts: 1, windowStartedAt: now } });
+          } else {
+            await tx.authLoginAttempt.update({ where: { keyHash }, data: { attempts: { increment: 1 } } });
+          }
+        }, { isolationLevel: 'Serializable' });
+
+        if (now.getTime() - lastLoginRateCleanupAt >= LOGIN_RATE_CLEANUP_INTERVAL_MS) {
+          lastLoginRateCleanupAt = now.getTime();
+          try {
+            await this.prisma.authLoginAttempt.deleteMany({
+              where: { windowStartedAt: { lt: new Date(now.getTime() - 24 * 60 * 60 * 1000) } },
+            });
+          } catch {
+            // Cleanup is best effort; failed-login tracking remains committed.
+          }
+        }
+        return;
+      } catch (error) {
+        const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : null;
+        if ((code !== 'P2034' && code !== 'P2002') || attempt === 2) throw error;
+      }
+    }
   }
 
   async validateUser(userId: string) {
@@ -168,7 +227,7 @@ export class AuthService {
     return user;
   }
 
-  async getMe(userId: string, activeOrganizationId?: string | null) {
+  async getMe(userId: string) {
     const user = await this.validateUser(userId);
 
     if (!user) {
@@ -182,23 +241,10 @@ export class AuthService {
         userId,
         status: 'ACTIVE',
         organization: { status: 'ACTIVE' },
-        ...(activeOrganizationId ? { organizationId: activeOrganizationId } : {}),
       },
       orderBy: { createdAt: 'asc' },
       select: { organizationId: true },
     });
-
-    const ownedOrganization = membership
-      ? null
-      : await this.prisma.organization.findFirst({
-          where: {
-            ownerId: userId,
-            status: 'ACTIVE',
-            ...(activeOrganizationId ? { id: activeOrganizationId } : {}),
-          },
-          orderBy: { createdAt: 'asc' },
-          select: { id: true },
-        });
 
     return {
       user: {
@@ -206,9 +252,10 @@ export class AuthService {
         username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
+        avatarUrl: user.avatarUrl,
         email: user.email,
         phone: user.phone,
-        organizationId: membership?.organizationId ?? ownedOrganization?.id ?? null,
+        organizationId: membership?.organizationId ?? null,
       },
     };
   }
@@ -245,6 +292,7 @@ export class AuthService {
           username: true,
           firstName: true,
           lastName: true,
+          avatarUrl: true,
           email: true,
           phone: true,
         },
@@ -407,12 +455,14 @@ export class AuthService {
         sub: user.id,
         username: user.username,
         organizationId: organizationId ?? undefined,
+        tokenVersion: user.tokenVersion,
       }),
       user: {
         id: user.id,
         username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
+        avatarUrl: user.avatarUrl,
         email: user.email,
         organizationId,
       },

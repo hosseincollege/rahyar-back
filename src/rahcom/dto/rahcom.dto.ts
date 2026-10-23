@@ -69,11 +69,31 @@ export class RahcomProvinceQueryDto {
   @IsOptional() @IsString() @MaxLength(80) province?: string;
 }
 
+export class CreateRahcomAxisDto {
+  @IsString() @MinLength(1) @MaxLength(80) province!: string;
+  @IsString() @MinLength(1) @MaxLength(120) name!: string;
+}
+
+export class UpdateRahcomAxisDto {
+  @IsString() @MinLength(1) @MaxLength(120) name!: string;
+}
+
+export class MergeRahcomAxisDto {
+  @IsString() @MinLength(1) targetAxisId!: string;
+}
+
 export class CreateRahcomSolarSnapshotDto {
   @IsString() @MaxLength(250000) downText!: string;
   @IsString() @MaxLength(250000) unreachableText!: string;
   @IsArray() @ArrayNotEmpty() @ArrayMaxSize(50) @IsString({ each: true }) equipmentColumns!: string[];
   @IsOptional() @IsString() @Matches(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})?$/) capturedAt?: string;
+}
+
+export class CreateRahcomTrafficSnapshotDto {
+  @IsString() @MinLength(1) @MaxLength(255) fileName!: string;
+  @IsString() @MinLength(1) @MaxLength(120) sheetName!: string;
+  @IsArray() @ArrayMinSize(2) @ArrayMaxSize(50) @IsString({ each: true }) headers!: string[];
+  @IsArray() @ArrayMaxSize(10000) rows!: string[][];
 }
 
 export class CreateRahcomActivityDto {

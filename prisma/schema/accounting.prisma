@@ -43,15 +43,15 @@ model AccountingInvoice {
 }
 
 model AccountingAccount {
-  id             String                  @id @default(cuid())
+  id             String   @id @default(cuid())
   organizationId String
   code           String
   name           String
   type           AccountingAccountType
-  isActive       Boolean                 @default(true)
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   voucherLines   AccountingVoucherLine[]
 
   @@unique([organizationId, code])
@@ -60,17 +60,17 @@ model AccountingAccount {
 }
 
 model AccountingVoucher {
-  id             String                  @id @default(cuid())
+  id             String   @id @default(cuid())
   organizationId String
   createdById    String
   number         String
   date           DateTime
   description    String
   status         AccountingVoucherStatus @default(DRAFT)
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy      User                    @relation("AccountingVoucherCreator", fields: [createdById], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      User @relation("AccountingVoucherCreator", fields: [createdById], references: [id])
   lines          AccountingVoucherLine[]
 
   @@unique([organizationId, number])
@@ -80,12 +80,12 @@ model AccountingVoucher {
 }
 
 model AccountingVoucherLine {
-  id          String            @id @default(cuid())
+  id          String   @id @default(cuid())
   voucherId   String
   accountId   String
   description String?
-  debit       Decimal           @default(0) @db.Decimal(18, 2)
-  credit      Decimal           @default(0) @db.Decimal(18, 2)
+  debit       Decimal  @default(0) @db.Decimal(18, 2)
+  credit      Decimal  @default(0) @db.Decimal(18, 2)
   voucher     AccountingVoucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
   account     AccountingAccount @relation(fields: [accountId], references: [id])
 

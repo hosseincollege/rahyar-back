@@ -24,7 +24,7 @@ import { RolesGuard } from './guards/roles.guard';
 import { Public } from './decorators/public.decorator';
 import type { Request } from 'express';
 
-type AuthenticatedRequest = Request & { user?: { id?: string; organizationId?: string | null } };
+type AuthenticatedRequest = Request & { user?: { id?: string } };
 
 @Controller('auth')
 export class AuthController {
@@ -42,7 +42,6 @@ export class AuthController {
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }
-
 
   @Public()
   @Post('logout')
@@ -62,7 +61,7 @@ export class AuthController {
       throw new UnauthorizedException('کاربر احراز هویت نشده است');
     }
 
-    return this.authService.getMe(userId, request.user?.organizationId);
+    return this.authService.getMe(userId);
   }
 
   @Patch('me')

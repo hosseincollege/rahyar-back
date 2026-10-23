@@ -27,6 +27,20 @@ model RahcomSystem {
   @@map("rahcom_systems")
 }
 
+model RahcomAxis {
+  id             String       @id @default(cuid())
+  organizationId String
+  province       String       @db.VarChar(80)
+  name           String       @db.VarChar(120)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, province, name])
+  @@index([organizationId, province])
+  @@map("rahcom_axes")
+}
+
 model RahcomActivity {
   id                 String        @id @default(cuid())
   organizationId     String
@@ -65,4 +79,20 @@ model RahcomSolarSnapshot {
 
   @@index([organizationId, capturedAt])
   @@map("rahcom_solar_snapshots")
+}
+
+model RahcomTrafficSnapshot {
+  id             String       @id @default(cuid())
+  organizationId String
+  createdById    String
+  fileName       String       @db.VarChar(255)
+  sheetName      String       @db.VarChar(120)
+  headers        Json         @db.JsonB
+  rows           Json         @db.JsonB
+  rowCount       Int
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@map("rahcom_traffic_snapshots")
 }

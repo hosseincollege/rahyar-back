@@ -5,14 +5,18 @@ import { RolesGuard } from '../core/auth/guards/roles.guard';
 import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
 import {
   CreateRahcomActivityDto,
+  CreateRahcomAxisDto,
   CreateRahcomSystemActivityDto,
   CreateRahcomSolarSnapshotDto,
+  CreateRahcomTrafficSnapshotDto,
   DeleteRahcomSystemsBodyDto,
   DeleteRahcomSystemsQueryDto,
   ImportRahcomSystemsDto,
+  MergeRahcomAxisDto,
   RahcomActivitiesQueryDto,
   RahcomProvinceQueryDto,
   UpdateRahcomSystemDto,
+  UpdateRahcomAxisDto,
 } from './dto/rahcom.dto';
 import { RahcomService } from './rahcom.service';
 
@@ -20,6 +24,27 @@ import { RahcomService } from './rahcom.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class RahcomController {
   constructor(private readonly service: RahcomService) {}
+
+  @Get('axes')
+  listAxes(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
+    return this.service.listAxes(user, query.province);
+  }
+  @Post('axes')
+  createAxis(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomAxisDto) {
+    return this.service.createAxis(user, body);
+  }
+  @Put('axes/:id')
+  updateAxis(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: UpdateRahcomAxisDto) {
+    return this.service.updateAxis(user, id, body.name);
+  }
+  @Post('axes/:id/merge')
+  mergeAxis(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: MergeRahcomAxisDto) {
+    return this.service.mergeAxis(user, id, body.targetAxisId);
+  }
+  @Delete('axes/:id')
+  deleteAxis(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.service.deleteAxis(user, id);
+  }
 
   @Get('systems')
   listSystems(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
@@ -64,6 +89,18 @@ export class RahcomController {
   @Post('solar-snapshots')
   createSolarSnapshot(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomSolarSnapshotDto) {
     return this.service.createSolarSnapshot(user, body);
+  }
+  @Get('traffic-snapshot')
+  listTrafficSnapshot(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.listTrafficSnapshot(user);
+  }
+  @Post('traffic-snapshots')
+  createTrafficSnapshot(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomTrafficSnapshotDto) {
+    return this.service.createTrafficSnapshot(user, body);
+  }
+  @Post('traffic-snapshot/apply-axes')
+  applyTrafficAxes(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.applyTrafficAxes(user);
   }
   @Delete('activities/:id')
   deleteActivity(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {

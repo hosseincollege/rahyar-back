@@ -58,9 +58,4 @@ export class DevelopmentController {
   applyTestData(@CurrentUser() user: AuthenticatedUser, @Param('moduleKey') moduleKey: string) {
     return this.developmentService.applyTestData(user, moduleKey);
   }
-
-  @Post('test-data/refresh')
-  refreshTestData(@CurrentUser() user: AuthenticatedUser) {
-    return this.developmentService.resetAndSeedTestData(user);
-  }
 }
