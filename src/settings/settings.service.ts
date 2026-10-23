@@ -386,6 +386,27 @@ export class SettingsService {
     return membership.organization;
   }
 
+  async getPublicBranding() {
+    return this.prisma.organization.findFirst({
+      where: { status: 'ACTIVE' },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        name: true,
+        logoUrl: true,
+        logoTone: true,
+        logoBackground: true,
+        settings: {
+          select: {
+            accentPreset: true,
+            accentLightColor: true,
+            accentDarkColor: true,
+            backgroundStyle: true,
+          },
+        },
+      },
+    });
+  }
+
   async uploadOrganizationLogo(
     id: string,
     file: { buffer: Buffer; mimetype: string; size: number },
@@ -703,9 +724,7 @@ export class SettingsService {
 
         if (!user) {
           const password = typeof item.password === 'string' ? item.password.trim() : '';
-          if (password.length < 8) {
-            throw new BadRequestException('برای حساب جدید، رمز عبور حداقل ۸ کاراکتری وارد کنید.');
-          }
+          if (!password) throw new BadRequestException('Password is required.');
           const email = item.email?.trim().toLowerCase() || null;
           const generatedUsername =
             item.username?.trim() ||
@@ -741,9 +760,7 @@ export class SettingsService {
 
           if (typeof item.password === 'string' && item.password.trim().length > 0) {
             const password = item.password.trim();
-            if (password.length < 8) {
-              throw new BadRequestException('رمز عبور باید حداقل ۸ کاراکتر باشد.');
-            }
+            if (!password) throw new BadRequestException('Password is required.');
             updateData.passwordHash = await bcrypt.hash(password, 12);
             updateData.tokenVersion = { increment: 1 };
           }

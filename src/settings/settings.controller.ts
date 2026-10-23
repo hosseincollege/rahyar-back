@@ -44,6 +44,13 @@ import { SaveRoleDto } from './roles/dto/save-role.dto';
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
+  @Public()
+  @Get('public-branding')
+  @Header('Cache-Control', 'no-store, max-age=0')
+  async getPublicBranding() {
+    return this.settingsService.getPublicBranding();
+  }
+
   /**
    * دریافت آمار بازدیدکنندگان عمومی (بدون نیاز به احراز هویت)
    */
