@@ -386,9 +386,9 @@ export class SettingsService {
     return membership.organization;
   }
 
-  async getPublicBranding() {
+  async getPublicBranding(organizationId?: string) {
     return this.prisma.organization.findFirst({
-      where: { status: 'ACTIVE' },
+      where: { status: 'ACTIVE', ...(organizationId ? { id: organizationId } : {}) },
       orderBy: { createdAt: 'asc' },
       select: {
         name: true,

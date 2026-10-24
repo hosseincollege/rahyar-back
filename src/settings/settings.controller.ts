@@ -10,6 +10,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   Req,
   UploadedFile,
   UseGuards,
@@ -47,8 +48,8 @@ export class SettingsController {
   @Public()
   @Get('public-branding')
   @Header('Cache-Control', 'no-store, max-age=0')
-  async getPublicBranding() {
-    return this.settingsService.getPublicBranding();
+  async getPublicBranding(@Query('organizationId') organizationId?: string) {
+    return this.settingsService.getPublicBranding(organizationId);
   }
 
   /**
