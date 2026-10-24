@@ -30,6 +30,7 @@ import { SettingsService } from './settings.service';
 import { CreateOrganizationDto } from './company/dto/create-organization.dto';
 import { UpdateOrganizationSettingsDto } from './company/dto/update-organization-settings.dto';
 import { UpdateOrganizationAppearanceDto } from './company/dto/update-organization-appearance.dto';
+import { UpdateShellVisibilityDto } from './company/dto/update-shell-visibility.dto';
 
 import { CreateBranchDto } from './organization/dto/create-branch.dto';
 import { UpdateBranchDto } from './organization/dto/update-branch.dto';
@@ -138,6 +139,16 @@ export class SettingsController {
       throw new BadRequestException('شناسه سازمان نامعتبر است.');
     }
     return this.settingsService.getOrganizationAppearance(id.trim(), user);
+  }
+
+  @Get('organization/:id/shell-visibility')
+  async getShellVisibility(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.settingsService.getShellVisibility(id.trim(), user);
+  }
+
+  @Put('organization/:id/shell-visibility')
+  async updateShellVisibility(@Param('id') id: string, @Body() dto: UpdateShellVisibilityDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.settingsService.updateShellVisibility(id.trim(), dto.shellVisibility ?? {}, user);
   }
 
   @Put('organization/:id/appearance')

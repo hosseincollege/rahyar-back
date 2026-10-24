@@ -94,6 +94,10 @@ export class RahcomController {
   listTrafficSnapshot(@CurrentUser() user: AuthenticatedUser) {
     return this.service.listTrafficSnapshot(user);
   }
+  @Get('traffic-snapshot/history')
+  listTrafficSystemHistory(@CurrentUser() user: AuthenticatedUser, @Query('systemCode') systemCode: string) {
+    return this.service.listTrafficSystemHistory(user, systemCode);
+  }
   @Post('traffic-snapshots')
   createTrafficSnapshot(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomTrafficSnapshotDto) {
     return this.service.createTrafficSnapshot(user, body);

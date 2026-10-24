@@ -171,6 +171,24 @@ export class RahcomService {
     const { organizationId, demoOnly } = await this.authorize(user);
     return this.prisma.rahcomTrafficSnapshot.findFirst({ where: { organizationId, ...(demoOnly ? { createdById: user.id } : {}) }, orderBy: { createdAt: 'desc' } });
   }
+
+  async listTrafficSystemHistory(user: AuthenticatedUser, requestedCode: string) {
+    const { organizationId, demoOnly } = await this.authorize(user);
+    const systemCode = String(requestedCode ?? '').trim().toUpperCase();
+    if (!systemCode || systemCode.length > 100) throw new BadRequestException('Provide a valid system code.');
+    const snapshots = await this.prisma.rahcomTrafficSnapshot.findMany({
+      where: { organizationId, ...(demoOnly ? { createdById: user.id } : {}) },
+      orderBy: { createdAt: 'desc' }, take: 100,
+      select: { id: true, fileName: true, sheetName: true, headers: true, rows: true, rowCount: true, createdAt: true },
+    });
+    return snapshots.flatMap((snapshot) => {
+      const headers = Array.isArray(snapshot.headers) ? snapshot.headers.map(String) : [];
+      const codeIndex = headers.findIndex((header) => header.replace(/[\s\u200c]/g, '').toLocaleLowerCase().includes('کدسامانه') || header.toLocaleLowerCase().includes('systemcode'));
+      if (codeIndex < 0 || !Array.isArray(snapshot.rows)) return [];
+      const row = (snapshot.rows as unknown[]).find((candidate): candidate is unknown[] => Array.isArray(candidate) && String(candidate[codeIndex] ?? '').trim().toUpperCase() === systemCode);
+      return row ? [{ id: snapshot.id, fileName: snapshot.fileName, sheetName: snapshot.sheetName, rowCount: snapshot.rowCount, createdAt: snapshot.createdAt, headers, row: row.map((cell) => String(cell ?? '')) }] : [];
+    });
+  }
   async createTrafficSnapshot(user: AuthenticatedUser, body: CreateRahcomTrafficSnapshotDto) {
     const { organizationId, isAdmin } = await this.authorize(user, true);
     if (!isAdmin) throw new ForbiddenException('Only organization administrators can upload the national traffic list.');
@@ -232,7 +250,7 @@ export class RahcomService {
     }
     if (!rowKeys.length) throw new BadRequestException('No rows with a valid province, system code and axis code were found.');
 
-    const axisNamesByKey = new Map<string, { province: string; name: string }>();
+    const axisNamesByKey = new Map<string, { province: string; axisCode: string; name: string }>();
     for (const key of labelCounts.keys()) {
       const separator = key.indexOf('\u0000');
       const province = key.slice(0, separator);
@@ -240,14 +258,14 @@ export class RahcomService {
       const labels = [...(labelCounts.get(key) ?? new Map()).entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
       const sourceName = labels[0]?.[0] ?? `محور ${axisCode}`;
       const normalizedName = canonicalRahcomAxisForProvince(province, sourceName) || sourceName;
-      axisNamesByKey.set(key, { province, name: normalizedName });
+      axisNamesByKey.set(key, { province, axisCode, name: normalizedName });
     }
 
-    const assignments = new Map<string, { province: string; name: string; codes: Set<string> }>();
+    const assignments = new Map<string, { province: string; axisCode: string; name: string; codes: Set<string> }>();
     for (const { key, systemCode } of rowKeys) {
       const axis = axisNamesByKey.get(key);
       if (!axis) continue;
-      const assignmentKey = `${axis.province}\u0000${axis.name}`;
+      const assignmentKey = key;
       const assignment = assignments.get(assignmentKey) ?? { ...axis, codes: new Set<string>() };
       assignment.codes.add(systemCode);
       assignments.set(assignmentKey, assignment);
@@ -256,14 +274,14 @@ export class RahcomService {
     const axisRows = [...new Map([...assignments.values()].map(({ province, name }) => [`${province}\u0000${name}`, { organizationId, province, name }])).values()];
     const mutations = [
       ...(axisRows.length ? [this.prisma.rahcomAxis.createMany({ data: axisRows, skipDuplicates: true })] : []),
-      ...[...assignments.values()].map(({ province, name, codes }) => this.prisma.rahcomSystem.updateMany({
+      ...[...assignments.values()].map(({ province, name, axisCode, codes }) => this.prisma.rahcomSystem.updateMany({
         where: { organizationId, province, ...(demoOnly ? { systemCode: { startsWith: this.demoSystemPrefix, in: [...codes] } } : { systemCode: { in: [...codes] } }) },
-        data: { axis: name },
+        data: { axis: name, axisCode },
       })),
     ];
     const results = await this.prisma.$transaction(mutations, { maxWait: 10_000, timeout: 30_000 });
     const updatedSystems = results.slice(axisRows.length ? 1 : 0).reduce((total, result) => total + ('count' in result ? result.count : 0), 0);
-    return { updatedSystems, unmatchedSystems: Math.max(0, listedSystems.size - updatedSystems), axisGroups: axisRows.length };
+    return { updatedSystems, unmatchedSystems: Math.max(0, listedSystems.size - updatedSystems), axisGroups: assignments.size };
   }
   async importSystems(user: AuthenticatedUser, body: ImportRahcomSystemsDto) {
     const access = await this.authorize(user, true);
@@ -272,7 +290,7 @@ export class RahcomService {
     if (!province || province.length > 80 || !Array.isArray(body?.systems) || body.systems.length > 10000) throw new BadRequestException('Select a province and provide at most 10,000 rows.');
     const configuredAxes = new Set((await this.prisma.rahcomAxis.findMany({ where: { organizationId, province }, select: { name: true } })).map(({ name }) => name));
     const rows = body.systems.map((raw, index): {
-      organizationId: string; province: string; systemName: string; systemCode: string; latitude: number; longitude: number; axis?: string | null;
+      organizationId: string; province: string; systemName: string; systemCode: string; latitude: number; longitude: number; axis?: string | null; axisCode?: string | null;
       details?: string | null; electricityBillId?: string | null; simIp?: string | null; radarIp?: string | null;
       cameraIp?: string | null; pcIp?: string | null; routerIp?: string | null; laptopIp?: string | null;
       incidentType?: string | null; incidentDetails?: string | null;
@@ -287,6 +305,7 @@ export class RahcomService {
       const optionalData = {
         ...(row.details !== undefined ? { details: this.optionalText(row.details, 1000) } : {}),
         ...(row.axis !== undefined ? { axis: this.optionalText(configuredAxes.has(String(row.axis ?? '').trim()) ? row.axis : canonicalRahcomAxisForProvince(province, row.axis), 120) } : {}),
+        ...(row.axisCode !== undefined ? { axisCode: this.optionalText(row.axisCode, 100) } : {}),
         ...(row.incidentType !== undefined ? { incidentType: row.incidentType } : {}),
         ...(row.incidentDetails !== undefined ? { incidentDetails: this.optionalText(row.incidentDetails, 1000) } : {}),
         ...(row.electricityBillId !== undefined ? { electricityBillId: this.optionalText(row.electricityBillId, 120) } : {}),
@@ -308,12 +327,12 @@ export class RahcomService {
       await this.prisma.rahcomAxis.createMany({ data: [...new Set([...initialIsfahanAxes, ...axisNames])].map((name) => ({ organizationId, province, name })), skipDuplicates: true });
     }
     await this.prisma.$transaction(rows.map((row) => {
-      const { details, axis, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, incidentType, incidentDetails, ...required } = row;
-      const optionalData = { details, axis, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, incidentType, incidentDetails };
+      const { details, axis, axisCode, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, incidentType, incidentDetails, ...required } = row;
+      const optionalData = { details, axis, axisCode, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, incidentType, incidentDetails };
       return this.prisma.rahcomSystem.upsert({
         where: { organizationId_province_systemCode: { organizationId, province, systemCode: row.systemCode } },
         update: { ...required, ...Object.fromEntries(Object.entries(optionalData).filter(([, value]) => value !== undefined)) },
-        create: { ...required, details: details ?? null, axis: axis ?? null, electricityBillId: electricityBillId ?? null, simIp: simIp ?? null, radarIp: radarIp ?? null, cameraIp: cameraIp ?? null, pcIp: pcIp ?? null, routerIp: routerIp ?? null, laptopIp: laptopIp ?? null, incidentType: incidentType ?? null, incidentDetails: incidentDetails ?? null },
+        create: { ...required, details: details ?? null, axis: axis ?? null, axisCode: axisCode ?? null, electricityBillId: electricityBillId ?? null, simIp: simIp ?? null, radarIp: radarIp ?? null, cameraIp: cameraIp ?? null, pcIp: pcIp ?? null, routerIp: routerIp ?? null, laptopIp: laptopIp ?? null, incidentType: incidentType ?? null, incidentDetails: incidentDetails ?? null },
       });
     }));
     return { imported: rows.length };
@@ -337,6 +356,7 @@ export class RahcomService {
     const optionalData = {
       ...(body.details !== undefined ? { details: this.optionalText(body.details, 1000) } : {}),
       ...(body.axis !== undefined ? { axis } : {}),
+      ...(body.axisCode !== undefined ? { axisCode: this.optionalText(body.axisCode, 100) } : {}),
       ...(body.incidentType !== undefined ? { incidentType: body.incidentType } : {}),
       ...(body.incidentDetails !== undefined ? { incidentDetails: this.optionalText(body.incidentDetails, 1000) } : {}),
       ...(body.electricityBillId !== undefined ? { electricityBillId: this.optionalText(body.electricityBillId, 120) } : {}),

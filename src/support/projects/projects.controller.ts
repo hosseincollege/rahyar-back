@@ -32,6 +32,11 @@ export class ProjectsController {
     return this.projectsService.findSupportProjects(user);
   }
 
+  @Get('rahcom')
+  getRahcomProject(@CurrentUser() user: AuthenticatedUser) {
+    return this.projectsService.getRahcomProject(user);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.projectsService.findOne(id, user);

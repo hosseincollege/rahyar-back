@@ -5,6 +5,7 @@ model RahcomSystem {
   systemName        String           @db.VarChar(200)
   systemCode        String           @db.VarChar(100)
   axis              String?          @db.VarChar(120)
+  axisCode          String?          @db.VarChar(100)
   incidentType      String?          @db.VarChar(24)
   incidentDetails   String?          @db.VarChar(1000)
   latitude          Float

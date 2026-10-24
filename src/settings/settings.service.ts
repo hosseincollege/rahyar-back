@@ -302,6 +302,25 @@ export class SettingsService {
     return { canView, canEdit, canViewRahcom, canManageRahcom, canViewAccounting, canViewHumanResources };
   }
 
+  async getShellVisibility(id: string, user: AuthenticatedUser) {
+    const access = await this.getOrganizationAccess(id, user);
+    if (!access.canView) throw new ForbiddenException('Organization access denied.');
+    const settings = await this.prisma.organizationSettings.findUnique({ where: { organizationId: id }, select: { shellVisibility: true } });
+    return { shellVisibility: settings?.shellVisibility ?? {} };
+  }
+
+  async updateShellVisibility(id: string, shellVisibility: Record<string, unknown>, user: AuthenticatedUser) {
+    const access = await this.getOrganizationAccess(id, user);
+    if (!access.canEdit) throw new ForbiddenException('Organization edit access denied.');
+    const settings = await this.prisma.organizationSettings.upsert({
+      where: { organizationId: id },
+      create: { organizationId: id, shellVisibility: shellVisibility as any },
+      update: { shellVisibility: shellVisibility as any },
+      select: { shellVisibility: true },
+    });
+    return { shellVisibility: settings.shellVisibility ?? {} };
+  }
+
   async getOrganizationAppearance(id: string, user: AuthenticatedUser) {
     const access = await this.getOrganizationAccess(id, user);
     if (!access.canView) {

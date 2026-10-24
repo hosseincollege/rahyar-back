@@ -21,6 +21,7 @@ export class RahcomSystemImportRowDto {
   @IsString() @MinLength(1) @MaxLength(200) systemName!: string;
   @IsString() @MinLength(1) @MaxLength(100) systemCode!: string;
   @IsOptional() @IsString() @MaxLength(120) axis?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) axisCode?: string | null;
   @IsOptional() @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE']) incidentType?: string | null;
   @IsOptional() @IsString() @MaxLength(1000) incidentDetails?: string | null;
   @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-90) @Max(90) latitude!: number;
@@ -45,6 +46,7 @@ export class UpdateRahcomSystemDto {
   @IsOptional() @IsString() @MinLength(1) @MaxLength(200) systemName?: string;
   @IsOptional() @IsString() @MinLength(1) @MaxLength(100) systemCode?: string;
   @IsOptional() @IsString() @MaxLength(120) axis?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) axisCode?: string | null;
   @IsOptional() @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE']) incidentType?: string | null;
   @IsOptional() @IsString() @MaxLength(1000) incidentDetails?: string | null;
   @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-90) @Max(90) latitude?: number;
