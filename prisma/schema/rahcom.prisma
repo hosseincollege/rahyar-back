@@ -97,3 +97,26 @@ model RahcomTrafficSnapshot {
   @@index([organizationId, createdAt])
   @@map("rahcom_traffic_snapshots")
 }
+
+model RahcomImportedTicket {
+  id             String       @id @default(cuid())
+  organizationId String
+  ticketCode     String       @db.VarChar(100)
+  systemCode     String       @default("") @db.VarChar(100)
+  summary        String       @db.Text
+  customer       String       @default("") @db.Text
+  equipment      String       @default("") @db.Text
+  type           String       @default("") @db.VarChar(120)
+  status         String       @default("") @db.VarChar(120)
+  priority       String       @default("") @db.VarChar(120)
+  supportTeam    String       @default("") @db.VarChar(200)
+  createdOn      String       @default("") @db.VarChar(120)
+  sourceFileName String       @db.VarChar(255)
+  importedAt     DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, ticketCode])
+  @@index([organizationId, systemCode])
+  @@index([organizationId, importedAt])
+  @@map("rahcom_imported_tickets")
+}

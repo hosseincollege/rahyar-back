@@ -9,6 +9,7 @@ import {
   CreateRahcomSystemActivityDto,
   CreateRahcomSolarSnapshotDto,
   CreateRahcomTrafficSnapshotDto,
+  ImportRahcomTicketsDto,
   DeleteRahcomSystemsBodyDto,
   DeleteRahcomSystemsQueryDto,
   ImportRahcomSystemsDto,
@@ -81,6 +82,14 @@ export class RahcomController {
   @Post('activities')
   createActivity(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomActivityDto) {
     return this.service.createActivity(user, body);
+  }
+  @Get('tickets')
+  listImportedTickets(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.listImportedTickets(user);
+  }
+  @Post('tickets/import')
+  importTickets(@CurrentUser() user: AuthenticatedUser, @Body() body: ImportRahcomTicketsDto) {
+    return this.service.importTickets(user, body);
   }
   @Get('solar-snapshots')
   listSolarSnapshots(@CurrentUser() user: AuthenticatedUser) {

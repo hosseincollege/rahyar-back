@@ -7,6 +7,7 @@ import type {
   CreateRahcomSystemActivityDto,
   CreateRahcomSolarSnapshotDto,
   CreateRahcomTrafficSnapshotDto,
+  ImportRahcomTicketsDto,
   ImportRahcomSystemsDto,
   UpdateRahcomAxisDto,
   RahcomActivitiesQueryDto,
@@ -65,6 +66,45 @@ export class RahcomService {
     const access = await this.authorize(user);
     const selectedProvince = this.scopedProvince(access, province);
     return this.prisma.rahcomSystem.findMany({ where: { organizationId: access.organizationId, ...(access.demoOnly ? { systemCode: { startsWith: this.demoSystemPrefix } } : {}), ...(selectedProvince ? { province: selectedProvince } : {}) }, orderBy: [{ province: 'asc' }, { systemName: 'asc' }] });
+  }
+  async listImportedTickets(user: AuthenticatedUser) {
+    const access = await this.authorize(user);
+    return this.prisma.rahcomImportedTicket.findMany({
+      where: { organizationId: access.organizationId },
+      orderBy: [{ importedAt: 'desc' }, { ticketCode: 'asc' }],
+    });
+  }
+  async importTickets(user: AuthenticatedUser, body: ImportRahcomTicketsDto) {
+    const access = await this.authorize(user, true);
+    const sourceFileName = body.sourceFileName.trim();
+    const rows = body.tickets.map((row) => ({
+      organizationId: access.organizationId,
+      ticketCode: row.ticketCode.trim(),
+      systemCode: row.systemCode?.trim() ?? '',
+      summary: row.summary?.trim() ?? '',
+      customer: row.customer?.trim() ?? '',
+      equipment: row.equipment?.trim() ?? '',
+      type: row.type?.trim() ?? '',
+      status: row.status?.trim() ?? '',
+      priority: row.priority?.trim() ?? '',
+      supportTeam: row.supportTeam?.trim() ?? '',
+      createdOn: row.createdOn?.trim() ?? '',
+      sourceFileName,
+      importedAt: new Date(),
+    }));
+    for (let offset = 0; offset < rows.length; offset += 250) {
+      const batch = rows.slice(offset, offset + 250);
+      await this.prisma.$transaction(batch.map((row) => this.prisma.rahcomImportedTicket.upsert({
+        where: { organizationId_ticketCode: { organizationId: row.organizationId, ticketCode: row.ticketCode } },
+        create: row,
+        update: {
+          systemCode: row.systemCode, summary: row.summary, customer: row.customer, equipment: row.equipment,
+          type: row.type, status: row.status, priority: row.priority, supportTeam: row.supportTeam,
+          createdOn: row.createdOn, sourceFileName: row.sourceFileName, importedAt: row.importedAt,
+        },
+      })));
+    }
+    return { imported: rows.length };
   }
   async listAxes(user: AuthenticatedUser, province?: string) {
     const access = await this.authorize(user);

@@ -98,6 +98,25 @@ export class CreateRahcomTrafficSnapshotDto {
   @IsArray() @ArrayMaxSize(10000) rows!: string[][];
 }
 
+export class RahcomImportedTicketRowDto {
+  @IsString() @MinLength(1) @MaxLength(100) ticketCode!: string;
+  @IsOptional() @IsString() @MaxLength(100) systemCode?: string;
+  @IsOptional() @IsString() @MaxLength(10000) summary?: string;
+  @IsOptional() @IsString() @MaxLength(10000) customer?: string;
+  @IsOptional() @IsString() @MaxLength(10000) equipment?: string;
+  @IsOptional() @IsString() @MaxLength(120) type?: string;
+  @IsOptional() @IsString() @MaxLength(120) status?: string;
+  @IsOptional() @IsString() @MaxLength(120) priority?: string;
+  @IsOptional() @IsString() @MaxLength(200) supportTeam?: string;
+  @IsOptional() @IsString() @MaxLength(120) createdOn?: string;
+}
+
+export class ImportRahcomTicketsDto {
+  @IsString() @MinLength(1) @MaxLength(255) sourceFileName!: string;
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10000) @ValidateNested({ each: true }) @Type(() => RahcomImportedTicketRowDto)
+  tickets!: RahcomImportedTicketRowDto[];
+}
+
 export class CreateRahcomActivityDto {
   @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) date!: string;
   @IsString() @IsIn(['EMAIL_SENT', 'SYSTEM_VISIT', 'OTHER']) activityType!: string;
