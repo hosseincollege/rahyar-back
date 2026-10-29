@@ -45,10 +45,11 @@ export class RahcomService {
     }
     const roles = membership.roles.map(({ role }) => role);
     const demoOnly = roles.some(({ key }) => key.toUpperCase() === 'DEMO_USER');
-    if (membership.organization.ownerId !== user.id) {
+    const isOrganizationAdmin = roles.some(({ key }) => ['ADMIN', 'SUPER_ADMIN'].includes(key.toUpperCase()));
+    if (membership.organization.ownerId !== user.id && !demoOnly && !isOrganizationAdmin) {
       throw new ForbiddenException('Only the organization owner can access Rahcom.');
     }
-    return { organizationId, demoOnly, isAdmin: true, province: null };
+    return { organizationId, demoOnly, isAdmin: isOrganizationAdmin || demoOnly || membership.organization.ownerId === user.id, province: null };
   }
   private scopedProvince(access: RahcomAccess, requested?: string) {
     const province = String(requested ?? '').trim();

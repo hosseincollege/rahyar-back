@@ -258,6 +258,7 @@ export class SettingsService {
           select: {
             role: {
               select: {
+                key: true,
                 permissions: {
                   select: { permission: { select: { key: true } } },
                 },
@@ -276,6 +277,7 @@ export class SettingsService {
       if (ownedOrganization) {
         return {
           canView: true,
+          canViewSharedSettings: true,
           canEdit: true,
           canViewRahcom: true,
           canManageRahcom: true,
@@ -283,7 +285,7 @@ export class SettingsService {
           canViewHumanResources: true,
         };
       }
-      return { canView: false, canEdit: false, canViewRahcom: false, canManageRahcom: false, canViewAccounting: false, canViewHumanResources: false };
+      return { canView: false, canViewSharedSettings: false, canEdit: false, canViewRahcom: false, canManageRahcom: false, canViewAccounting: false, canViewHumanResources: false };
     }
 
     const isOwner = membership.organization.ownerId === user.id;
@@ -292,19 +294,21 @@ export class SettingsService {
         memberRole.role.permissions.map((item) => item.permission.key),
       ),
     );
+    const isDemoUser = membership.roles.some(({ role }) => role.key.toUpperCase() === 'DEMO_USER');
+    const isOrganizationAdmin = membership.roles.some(({ role }) => ['ADMIN', 'SUPER_ADMIN'].includes(role.key.toUpperCase()));
     const canEdit = isOwner || permissions.has('settings.write');
     const canView = canEdit || permissions.has('settings.read');
-    const canManageRahcom = isOwner;
-    const canViewRahcom = isOwner;
-    const canViewAccounting = isOwner || permissions.has('accounting.read') || permissions.has('accounting.write');
-    const canViewHumanResources = isOwner || [...permissions].some((key) => key.startsWith('hr.'));
+    const canManageRahcom = isOwner || isOrganizationAdmin;
+    const canViewRahcom = canManageRahcom || isDemoUser;
+    const canViewAccounting = isOwner || isOrganizationAdmin || permissions.has('accounting.read') || permissions.has('accounting.write');
+    const canViewHumanResources = isOwner || isOrganizationAdmin || [...permissions].some((key) => key.startsWith('hr.'));
 
-    return { canView, canEdit, canViewRahcom, canManageRahcom, canViewAccounting, canViewHumanResources };
+    return { canView, canViewSharedSettings: true, canEdit, canViewRahcom, canManageRahcom, canViewAccounting, canViewHumanResources };
   }
 
   async getShellVisibility(id: string, user: AuthenticatedUser) {
     const access = await this.getOrganizationAccess(id, user);
-    if (!access.canView) throw new ForbiddenException('Organization access denied.');
+    if (!access.canViewSharedSettings) throw new ForbiddenException('Organization access denied.');
     const settings = await this.prisma.organizationSettings.findUnique({ where: { organizationId: id }, select: { shellVisibility: true } });
     return { shellVisibility: settings?.shellVisibility ?? {} };
   }
@@ -323,7 +327,7 @@ export class SettingsService {
 
   async getOrganizationAppearance(id: string, user: AuthenticatedUser) {
     const access = await this.getOrganizationAccess(id, user);
-    if (!access.canView) {
+    if (!access.canViewSharedSettings) {
       throw new ForbiddenException('مجوز مشاهده تنظیمات این سازمان را ندارید.');
     }
 
