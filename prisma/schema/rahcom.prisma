@@ -84,6 +84,21 @@ model RahcomSolarSnapshot {
   @@map("rahcom_solar_snapshots")
 }
 
+model RahcomSolarSpecialSystem {
+  id             String       @id @default(cuid())
+  organizationId String
+  province       String       @db.VarChar(80)
+  systemCode     String       @db.VarChar(100)
+  category       String       @db.VarChar(32)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, province, systemCode])
+  @@index([organizationId, province])
+  @@map("rahcom_solar_special_systems")
+}
+
 model RahcomTrafficSnapshot {
   id             String       @id @default(cuid())
   organizationId String

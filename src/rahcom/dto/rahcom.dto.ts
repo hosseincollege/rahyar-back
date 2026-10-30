@@ -22,7 +22,7 @@ export class RahcomSystemImportRowDto {
   @IsString() @MinLength(1) @MaxLength(100) systemCode!: string;
   @IsOptional() @IsString() @MaxLength(120) axis?: string | null;
   @IsOptional() @IsString() @MaxLength(100) axisCode?: string | null;
-  @IsOptional() @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE']) incidentType?: string | null;
+  @IsOptional() @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE', 'WIDENING_RELOCATION']) incidentType?: string | null;
   @IsOptional() @IsString() @MaxLength(1000) incidentDetails?: string | null;
   @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-90) @Max(90) latitude!: number;
   @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-180) @Max(180) longitude!: number;
@@ -47,7 +47,7 @@ export class UpdateRahcomSystemDto {
   @IsOptional() @IsString() @MinLength(1) @MaxLength(100) systemCode?: string;
   @IsOptional() @IsString() @MaxLength(120) axis?: string | null;
   @IsOptional() @IsString() @MaxLength(100) axisCode?: string | null;
-  @IsOptional() @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE']) incidentType?: string | null;
+  @IsOptional() @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE', 'WIDENING_RELOCATION']) incidentType?: string | null;
   @IsOptional() @IsString() @MaxLength(1000) incidentDetails?: string | null;
   @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-90) @Max(90) latitude?: number;
   @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-180) @Max(180) longitude?: number;
@@ -91,6 +91,17 @@ export class CreateRahcomSolarSnapshotDto {
   @IsString() @MaxLength(250000) unreachableText!: string;
   @IsArray() @ArrayNotEmpty() @ArrayMaxSize(50) @IsString({ each: true }) equipmentColumns!: string[];
   @IsOptional() @IsString() @Matches(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})?$/) capturedAt?: string;
+}
+
+export class ReplaceRahcomSolarSpecialSystemsDto {
+  @IsString() @MaxLength(80) @Matches(/^[a-z]+(?:-[a-z]+)*$/) province!: string;
+  @IsArray() @ArrayMaxSize(10000) @ValidateNested({ each: true }) @Type(() => RahcomSolarSpecialSystemDto)
+  systems!: RahcomSolarSpecialSystemDto[];
+}
+
+export class RahcomSolarSpecialSystemDto {
+  @IsString() @Matches(/^\d{3}[A-Z]\d{5}$/i) systemCode!: string;
+  @IsString() @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE', 'WIDENING_RELOCATION']) category!: string;
 }
 
 export class CreateRahcomTrafficSnapshotDto {

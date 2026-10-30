@@ -49,6 +49,7 @@ model Organization {
   rahcomTrafficSnapshots RahcomTrafficSnapshot[]
   rahcomActivities    RahcomActivity[]
   rahcomSolarSnapshots RahcomSolarSnapshot[]
+  rahcomSolarSpecialSystems RahcomSolarSpecialSystem[]
   rahcomImportedTickets RahcomImportedTicket[]
 
   @@index([installationId])

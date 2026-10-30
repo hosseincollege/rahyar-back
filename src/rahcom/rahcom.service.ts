@@ -6,6 +6,7 @@ import type {
   CreateRahcomAxisDto,
   CreateRahcomSystemActivityDto,
   CreateRahcomSolarSnapshotDto,
+  ReplaceRahcomSolarSpecialSystemsDto,
   CreateRahcomTrafficSnapshotDto,
   ImportRahcomTicketsDto,
   ImportRahcomSystemsDto,
@@ -314,6 +315,74 @@ export class RahcomService {
       downText: body.downText, unreachableText: body.unreachableText,
       equipmentColumns: [...new Set(body.equipmentColumns.map((item) => item.trim()).filter(Boolean))],
     } });
+  }
+  async updateSolarSnapshot(user: AuthenticatedUser, id: string, body: CreateRahcomSolarSnapshotDto) {
+    const access = await this.authorize(user, true);
+    const existing = await this.prisma.rahcomSolarSnapshot.findFirst({ where: { id, organizationId: access.organizationId } });
+    if (!existing) throw new NotFoundException('Solar status was not found.');
+    this.scopedProvince(access, existing.province);
+    const province = this.scopedProvince(access, body.province);
+    if (province !== existing.province) throw new BadRequestException('A saved solar status cannot be moved to another province.');
+    const capturedAt = body.capturedAt ? new Date(body.capturedAt) : existing.capturedAt;
+    if (Number.isNaN(capturedAt.getTime())) throw new BadRequestException('Invalid snapshot date and time.');
+    const text = `${body.downText}\n${body.unreachableText}`;
+    const codes = [...new Set((text.match(/\d{3}[A-Z]\d{5}/gi) ?? []).map((code) => code.toUpperCase()))];
+    if (codes.length) {
+      const systems = await this.prisma.rahcomSystem.findMany({ where: { organizationId: access.organizationId, systemCode: { in: codes, mode: 'insensitive' } }, select: { systemCode: true, province: true } });
+      const knownCodes = new Set(systems.map((system) => system.systemCode.toUpperCase()));
+      const provinceCodes = new Set(systems.filter((system) => system.province === existing.province).map((system) => system.systemCode.toUpperCase()));
+      if (codes.some((code) => knownCodes.has(code) && !provinceCodes.has(code)) || (existing.province !== 'isfahan' && /Rahcom\s*\([^)]*(?:-ESF(?:-|\))|ISFAHAN)/i.test(text))) {
+        throw new BadRequestException('The solar report contains systems from another province. Split the report by province before saving.');
+      }
+    }
+    return this.prisma.rahcomSolarSnapshot.update({ where: { id: existing.id }, data: {
+      capturedAt, downText: body.downText, unreachableText: body.unreachableText,
+      equipmentColumns: [...new Set(body.equipmentColumns.map((item) => item.trim()).filter(Boolean))],
+    } });
+  }
+  async deleteSolarSnapshot(user: AuthenticatedUser, id: string) {
+    const access = await this.authorize(user, true);
+    const existing = await this.prisma.rahcomSolarSnapshot.findFirst({ where: { id, organizationId: access.organizationId } });
+    if (!existing) throw new NotFoundException('Solar status was not found.');
+    this.scopedProvince(access, existing.province);
+    await this.prisma.rahcomSolarSnapshot.delete({ where: { id: existing.id } });
+    return { deleted: true };
+  }
+  async listSolarSpecialSystems(user: AuthenticatedUser, requestedProvince?: string) {
+    const access = await this.authorize(user);
+    const province = this.scopedProvince(access, requestedProvince);
+    const demoCodes = access.demoOnly
+      ? (await this.prisma.rahcomSystem.findMany({ where: { organizationId: access.organizationId, province: 'isfahan', systemCode: { startsWith: this.demoSystemPrefix } }, select: { systemCode: true } })).map(({ systemCode }) => systemCode)
+      : null;
+    return this.prisma.rahcomSolarSpecialSystem.findMany({
+      where: { organizationId: access.organizationId, ...(province ? { province } : {}), ...(demoCodes ? { systemCode: { in: demoCodes } } : {}) },
+      orderBy: [{ province: 'asc' }, { systemCode: 'asc' }],
+    });
+  }
+  async replaceSolarSpecialSystems(user: AuthenticatedUser, body: ReplaceRahcomSolarSpecialSystemsDto) {
+    const access = await this.authorize(user, true);
+    const province = this.scopedProvince(access, body.province);
+    if (!province || !isRahcomProvinceId(province)) throw new BadRequestException('Choose a supported province for the special system list.');
+    const systems = [...new Map(body.systems.map((item) => [item.systemCode.trim().toUpperCase(), item.category])).entries()];
+    const codes = systems.map(([systemCode]) => systemCode);
+    if (codes.length) {
+      const knownSystems = await this.prisma.rahcomSystem.findMany({
+        where: { organizationId: access.organizationId, systemCode: { in: codes, mode: 'insensitive' } },
+        select: { systemCode: true, province: true },
+      });
+      const knownCodes = new Set(knownSystems.map(({ systemCode }) => systemCode.toUpperCase()));
+      const provinceCodes = new Set(knownSystems.filter((system) => system.province === province).map(({ systemCode }) => systemCode.toUpperCase()));
+      if (codes.some((code) => knownCodes.has(code) && !provinceCodes.has(code))) {
+        throw new BadRequestException('The special system list contains a code assigned to another province.');
+      }
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.rahcomSolarSpecialSystem.deleteMany({ where: { organizationId: access.organizationId, province } });
+      if (systems.length) await tx.rahcomSolarSpecialSystem.createMany({
+        data: systems.map(([systemCode, category]) => ({ organizationId: access.organizationId, province, systemCode, category })),
+      });
+    });
+    return this.prisma.rahcomSolarSpecialSystem.findMany({ where: { organizationId: access.organizationId, province }, orderBy: { systemCode: 'asc' } });
   }
   async listTrafficSnapshot(user: AuthenticatedUser, requestedProvince?: string) {
     const access = await this.authorize(user);

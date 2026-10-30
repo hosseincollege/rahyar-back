@@ -8,6 +8,7 @@ import {
   CreateRahcomAxisDto,
   CreateRahcomSystemActivityDto,
   CreateRahcomSolarSnapshotDto,
+  ReplaceRahcomSolarSpecialSystemsDto,
   CreateRahcomTrafficSnapshotDto,
   ImportRahcomTicketsDto,
   DeleteRahcomSystemsBodyDto,
@@ -116,6 +117,22 @@ export class RahcomController {
   @Post('solar-snapshots')
   createSolarSnapshot(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomSolarSnapshotDto) {
     return this.service.createSolarSnapshot(user, body);
+  }
+  @Put('solar-snapshots/:id')
+  updateSolarSnapshot(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: CreateRahcomSolarSnapshotDto) {
+    return this.service.updateSolarSnapshot(user, id, body);
+  }
+  @Delete('solar-snapshots/:id')
+  deleteSolarSnapshot(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.service.deleteSolarSnapshot(user, id);
+  }
+  @Get('solar-special-systems')
+  listSolarSpecialSystems(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
+    return this.service.listSolarSpecialSystems(user, query.province);
+  }
+  @Put('solar-special-systems')
+  replaceSolarSpecialSystems(@CurrentUser() user: AuthenticatedUser, @Body() body: ReplaceRahcomSolarSpecialSystemsDto) {
+    return this.service.replaceSolarSpecialSystems(user, body);
   }
   @Get('traffic-snapshot')
   listTrafficSnapshot(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
