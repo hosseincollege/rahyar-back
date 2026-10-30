@@ -18,6 +18,8 @@ import {
   RahcomProvinceQueryDto,
   UpdateRahcomSystemDto,
   UpdateRahcomAxisDto,
+  UpdateRahcomMemberProvinceDto,
+  UpdateRahcomSelectedProvinceDto,
 } from './dto/rahcom.dto';
 import { RahcomService } from './rahcom.service';
 
@@ -29,6 +31,14 @@ export class RahcomController {
   @Get('axes')
   listAxes(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
     return this.service.listAxes(user, query.province);
+  }
+  @Get('me')
+  getRahcomAccess(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.getRahcomAccess(user);
+  }
+  @Put('me/province')
+  updateMySelectedProvince(@CurrentUser() user: AuthenticatedUser, @Body() body: UpdateRahcomSelectedProvinceDto) {
+    return this.service.updateSelectedProvince(user, body.province);
   }
   @Post('axes')
   createAxis(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomAxisDto) {
@@ -84,24 +94,32 @@ export class RahcomController {
     return this.service.createActivity(user, body);
   }
   @Get('tickets')
-  listImportedTickets(@CurrentUser() user: AuthenticatedUser) {
-    return this.service.listImportedTickets(user);
+  listImportedTickets(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
+    return this.service.listImportedTickets(user, query.province);
   }
   @Post('tickets/import')
   importTickets(@CurrentUser() user: AuthenticatedUser, @Body() body: ImportRahcomTicketsDto) {
     return this.service.importTickets(user, body);
   }
+  @Get('members')
+  listProvinceAssignments(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.listProvinceAssignments(user);
+  }
+  @Put('members/:id/province')
+  updateProvinceAssignment(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: UpdateRahcomMemberProvinceDto) {
+    return this.service.updateProvinceAssignment(user, id, body.province ?? null);
+  }
   @Get('solar-snapshots')
-  listSolarSnapshots(@CurrentUser() user: AuthenticatedUser) {
-    return this.service.listSolarSnapshots(user);
+  listSolarSnapshots(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
+    return this.service.listSolarSnapshots(user, query.province);
   }
   @Post('solar-snapshots')
   createSolarSnapshot(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomSolarSnapshotDto) {
     return this.service.createSolarSnapshot(user, body);
   }
   @Get('traffic-snapshot')
-  listTrafficSnapshot(@CurrentUser() user: AuthenticatedUser) {
-    return this.service.listTrafficSnapshot(user);
+  listTrafficSnapshot(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
+    return this.service.listTrafficSnapshot(user, query.province);
   }
   @Get('traffic-snapshot/history')
   listTrafficSystemHistory(@CurrentUser() user: AuthenticatedUser, @Query('systemCode') systemCode: string) {

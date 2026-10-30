@@ -10,20 +10,24 @@ export const defaultIsfahanAxes = [
 ] as const;
 
 const provinceLabels: Record<string, string[]> = {
-  isfahan: ['اصفهان'], tehran: ['تهران'], 'east-azerbaijan': ['آذربایجان شرقی'], 'west-azerbaijan': ['آذربایجان غربی'],
-  ardabil: ['اردبیل'], alborz: ['البرز'], ilam: ['ایلام'], bushehr: ['بوشهر'], 'charmahal-bakhtiari': ['چهارمحال و بختیاری'],
-  'south-khorasan': ['خراسان جنوبی'], 'razavi-khorasan': ['خراسان رضوی'], 'north-khorasan': ['خراسان شمالی'], khuzestan: ['خوزستان'],
-  zanjan: ['زنجان'], semnan: ['سمنان'], 'sistan-baluchestan': ['سیستان و بلوچستان', 'سيستان و بلوچستان'], fars: ['فارس'], qazvin: ['قزوین', 'قزوين'],
-  qom: ['قم'], kurdistan: ['کردستان'], kerman: ['کرمان', 'کرمان جنوب'], kermanshah: ['کرمانشاه'], 'kohgiluyeh-boyerahmad': ['کهگیلویه و بویراحمد'],
-  golestan: ['گلستان'], gilan: ['گیلان'], lorestan: ['لرستان'], mazandaran: ['مازندران'], markazi: ['مرکزی'], hormozgan: ['هرمزگان'],
-  hamadan: ['همدان'], yazd: ['یزد'],
+  isfahan: ['\u0627\u0635\u0641\u0647\u0627\u0646'], tehran: ['\u062a\u0647\u0631\u0627\u0646'], 'east-azerbaijan': ['\u0622\u0630\u0631\u0628\u0627\u06cc\u062c\u0627\u0646 \u0634\u0631\u0642\u06cc'], 'west-azerbaijan': ['\u0622\u0630\u0631\u0628\u0627\u06cc\u062c\u0627\u0646 \u063a\u0631\u0628\u06cc'],
+  ardabil: ['\u0627\u0631\u062f\u0628\u06cc\u0644'], alborz: ['\u0627\u0644\u0628\u0631\u0632'], ilam: ['\u0627\u06cc\u0644\u0627\u0645'], bushehr: ['\u0628\u0648\u0634\u0647\u0631'], 'charmahal-bakhtiari': ['\u0686\u0647\u0627\u0631\u0645\u062d\u0627\u0644 \u0648 \u0628\u062e\u062a\u06cc\u0627\u0631\u06cc'],
+  'south-khorasan': ['\u062e\u0631\u0627\u0633\u0627\u0646 \u062c\u0646\u0648\u0628\u06cc'], 'razavi-khorasan': ['\u062e\u0631\u0627\u0633\u0627\u0646 \u0631\u0636\u0648\u06cc'], 'north-khorasan': ['\u062e\u0631\u0627\u0633\u0627\u0646 \u0634\u0645\u0627\u0644\u06cc'], khuzestan: ['\u062e\u0648\u0632\u0633\u062a\u0627\u0646'],
+  zanjan: ['\u0632\u0646\u062c\u0627\u0646'], semnan: ['\u0633\u0645\u0646\u0627\u0646'], 'sistan-baluchestan': ['\u0633\u06cc\u0633\u062a\u0627\u0646 \u0648 \u0628\u0644\u0648\u0686\u0633\u062a\u0627\u0646', '\u0633\u064a\u0633\u062a\u0627\u0646 \u0648 \u0628\u0644\u0648\u0686\u0633\u062a\u0627\u0646'], fars: ['\u0641\u0627\u0631\u0633'], qazvin: ['\u0642\u0632\u0648\u06cc\u0646', '\u0642\u0632\u0648\u064a\u0646'],
+  qom: ['\u0642\u0645'], kurdistan: ['\u06a9\u0631\u062f\u0633\u062a\u0627\u0646'], kerman: ['\u06a9\u0631\u0645\u0627\u0646', '\u06a9\u0631\u0645\u0627\u0646 \u062c\u0646\u0648\u0628'], kermanshah: ['\u06a9\u0631\u0645\u0627\u0646\u0634\u0627\u0647'], 'kohgiluyeh-boyerahmad': ['\u06a9\u0647\u06af\u06cc\u0644\u0648\u06cc\u0647 \u0648 \u0628\u0648\u06cc\u0631\u0627\u062d\u0645\u062f'],
+  golestan: ['\u06af\u0644\u0633\u062a\u0627\u0646'], gilan: ['\u06af\u06cc\u0644\u0627\u0646'], lorestan: ['\u0644\u0631\u0633\u062a\u0627\u0646'], mazandaran: ['\u0645\u0627\u0632\u0646\u062f\u0631\u0627\u0646'], markazi: ['\u0645\u0631\u06a9\u0632\u06cc'], hormozgan: ['\u0647\u0631\u0645\u0632\u06af\u0627\u0646'],
+  hamadan: ['\u0647\u0645\u062f\u0627\u0646'], yazd: ['\u06cc\u0632\u062f'],
 };
 
-const normalizeProvinceLabel = (value: string) => value.trim().replace(/[يى]/g, 'ی').replace(/ك/g, 'ک').replace(/[\u200c\s\-]/g, '');
+const normalizeProvinceLabel = (value: string) => value.trim().replace(/^\u0627\u0633\u062a\u0627\u0646\s*/, '').replace(/[\u064a\u0649]/g, '\u06cc').replace(/\u0643/g, '\u06a9').replace(/[\u200c\s\-]/g, '');
 const provinceIdsByLabel = new Map(Object.entries(provinceLabels).flatMap(([id, labels]) => labels.map((label) => [normalizeProvinceLabel(label), id] as const)));
 
 export function rahcomProvinceIdFromLabel(value: string) {
   return provinceIdsByLabel.get(normalizeProvinceLabel(value)) ?? null;
+}
+
+export function isRahcomProvinceId(value: string) {
+  return Object.prototype.hasOwnProperty.call(provinceLabels, value);
 }
 
 const normalize = (value: string) => value.toLocaleLowerCase('fa').replace(/[يى]/g, 'ی').replace(/ك/g, 'ک').replace(/[\u200c\s\-–—_،؛,.]/g, '');

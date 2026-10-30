@@ -35,6 +35,14 @@ export class DepartmentStructureController {
     return this.structureService.getOverview(id.trim(), user);
   }
 
+  @Get('branches/:id/employees')
+  getBranchEmployees(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.structureService.getBranchEmployees(id.trim(), user);
+  }
+
   @Get('departments/:id/available-employees')
   getAvailableEmployees(
     @Param('id') id: string,

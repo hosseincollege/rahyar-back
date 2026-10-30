@@ -3,6 +3,8 @@
 
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../core/prisma/prisma.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { ProjectsModule } from './projects/projects.module';
 import { SettingsController } from './settings.controller';
 import { SettingsService } from './settings.service';
 import { OrganizationLogoStorageService } from './company/organization-logo-storage.service';
@@ -10,7 +12,7 @@ import { DepartmentStructureController } from './organization/department-structu
 import { DepartmentStructureService } from './organization/department-structure.service';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, NotificationsModule, ProjectsModule],
   controllers: [SettingsController, DepartmentStructureController],
   providers: [
     SettingsService,

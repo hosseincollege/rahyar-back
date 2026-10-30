@@ -1,7 +1,7 @@
 /**
  * @file src/core/setup/setup.module.ts
  * @type backend
- * @description ماژول بررسی وضعیت نصب اولیه و راه‌اندازی سیستم ERP Pro
+ * @description Rahyar backend authentication and setup
  */
 
 import { Module } from '@nestjs/common';

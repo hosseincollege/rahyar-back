@@ -1,7 +1,7 @@
 /**
  * @file src/core/auth/guards/roles.guard.ts
  * @type backend
- * @description گارد کنترل نقش‌ها برای محدودسازی endpointهای ERP Pro
+ * @description Rahyar backend authentication and setup
  */
 
 import {

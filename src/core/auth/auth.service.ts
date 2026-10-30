@@ -162,7 +162,7 @@ export class AuthService {
   private dummyPasswordHash: Promise<string> | null = null;
 
   private async compareAgainstDummyHash(password: string): Promise<boolean> {
-    this.dummyPasswordHash ??= bcrypt.hash('not-a-real-erp-account-password', 12);
+    this.dummyPasswordHash ??= bcrypt.hash('not-a-real-rahyar-account-password', 12);
     return bcrypt.compare(password, await this.dummyPasswordHash);
   }
 

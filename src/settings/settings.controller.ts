@@ -235,25 +235,29 @@ export class SettingsController {
   }
 
   @Get('roles/:organizationId')
-  async getRoles(@Param('organizationId') organizationId: string) {
+  async getRoles(
+    @Param('organizationId') organizationId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     if (!organizationId || organizationId.trim() === '') {
       throw new BadRequestException('شناسه سازمان نامعتبر است.');
     }
 
-    return this.settingsService.getRoles(organizationId.trim());
+    return this.settingsService.getRoles(organizationId.trim(), user);
   }
 
   @Put('roles/:organizationId')
   async saveRoles(
     @Param('organizationId') organizationId: string,
     @Body() roles: SaveRoleDto[],
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     if (!organizationId || organizationId.trim() === '') {
       throw new BadRequestException('شناسه سازمان نامعتبر است.');
     }
 
     const payload = Array.isArray(roles) ? roles : (roles as any)?.roles || [];
-    return this.settingsService.saveRoles(organizationId.trim(), payload);
+    return this.settingsService.saveRoles(organizationId.trim(), payload, user);
   }
 
   @Get('branches/:organizationId')
@@ -394,6 +398,19 @@ export class SettingsController {
     return this.settingsService.saveUsers(
       organizationId.trim(),
       usersList,
+      user,
+    );
+  }
+
+  @Delete('users/:organizationId/:userId')
+  async removeOrganizationUser(
+    @Param('organizationId') organizationId: string,
+    @Param('userId') userId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.settingsService.removeOrganizationUser(
+      organizationId.trim(),
+      userId.trim(),
       user,
     );
   }

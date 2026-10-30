@@ -60,6 +60,8 @@ model OrganizationMember {
   id             String           @id @default(cuid())
   organizationId String
   userId         String
+  rahcomProvince String?          @db.VarChar(80)
+  rahcomSelectedProvince String?  @db.VarChar(80)
   status         MembershipStatus @default(ACTIVE)
   joinedAt       DateTime?
   invitedAt      DateTime?

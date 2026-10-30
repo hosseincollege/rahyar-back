@@ -19,6 +19,7 @@ Set these project environment variables in Vercel, then redeploy:
 - **Backend project (recommended for Vercel Functions):** `DATABASE_URL_POOLED=<pooled Prisma Postgres connection string>`
 - **Backend project:** `JWT_SECRET=<long random private secret>`
 - **Backend project (optional):** `JWT_EXPIRES_IN=86400`
+- **Backend project (optional):** `RAHYAR_FRONTEND_ORIGINS=<comma-separated exact Rahyar frontend origins>` for additional preview deployments. The API accepts the production Rahyar frontend and local port `3015` by default; it does not allow arbitrary Vercel origins.
 
 The Prisma Postgres Vercel integration sets `DATABASE_URL` to a direct connection string. Keep it for Prisma CLI operations such as `db:push`; for production function traffic, create a pooled connection string in Prisma Console and add it to the backend project as `DATABASE_URL_POOLED`. The API uses `DATABASE_URL_POOLED` when present and falls back to `DATABASE_URL`. The PostgreSQL service installed on a developer's computer is not reachable by Vercel; do not expose the local database to the public internet. The backend's Vercel function is routed through `api/index.ts` by `vercel.json`.
 

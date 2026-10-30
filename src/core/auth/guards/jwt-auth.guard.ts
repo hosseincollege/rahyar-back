@@ -1,7 +1,7 @@
 /**
  * @file src/core/auth/guards/jwt-auth.guard.ts
  * @type backend
- * @description گارد عمومی احراز هویت با JWT برای محافظت از endpointهای ERP Pro
+ * @description Rahyar backend authentication and setup
  */
 
 import { ExecutionContext, Injectable } from '@nestjs/common';

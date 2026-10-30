@@ -65,6 +65,7 @@ export class RahcomActivitiesQueryDto {
   @IsOptional() @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) date?: string;
   @IsOptional() @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) from?: string;
   @IsOptional() @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) to?: string;
+  @IsOptional() @IsString() @MaxLength(80) province?: string;
 }
 
 export class RahcomProvinceQueryDto {
@@ -85,6 +86,7 @@ export class MergeRahcomAxisDto {
 }
 
 export class CreateRahcomSolarSnapshotDto {
+  @IsString() @MaxLength(80) @Matches(/^[a-z]+(?:-[a-z]+)*$/) province!: string;
   @IsString() @MaxLength(250000) downText!: string;
   @IsString() @MaxLength(250000) unreachableText!: string;
   @IsArray() @ArrayNotEmpty() @ArrayMaxSize(50) @IsString({ each: true }) equipmentColumns!: string[];
@@ -101,6 +103,7 @@ export class CreateRahcomTrafficSnapshotDto {
 export class RahcomImportedTicketRowDto {
   @IsString() @MinLength(1) @MaxLength(100) ticketCode!: string;
   @IsOptional() @IsString() @MaxLength(100) systemCode?: string;
+  @IsOptional() @IsString() @MaxLength(80) province?: string | null;
   @IsOptional() @IsString() @MaxLength(10000) summary?: string;
   @IsOptional() @IsString() @MaxLength(10000) customer?: string;
   @IsOptional() @IsString() @MaxLength(10000) equipment?: string;
@@ -117,6 +120,14 @@ export class ImportRahcomTicketsDto {
   tickets!: RahcomImportedTicketRowDto[];
 }
 
+export class UpdateRahcomMemberProvinceDto {
+  @IsOptional() @IsString() @MaxLength(80) province?: string | null;
+}
+
+export class UpdateRahcomSelectedProvinceDto {
+  @IsString() @MinLength(1) @MaxLength(80) province!: string;
+}
+
 export class CreateRahcomActivityDto {
   @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) date!: string;
   @IsString() @IsIn(['EMAIL_SENT', 'SYSTEM_VISIT', 'OTHER']) activityType!: string;
@@ -125,6 +136,7 @@ export class CreateRahcomActivityDto {
   @IsOptional() @IsString() @MaxLength(100) systemId?: string;
   @IsOptional() @IsString() @MaxLength(200) accompaniedBy?: string | null;
   @IsOptional() @IsString() @MaxLength(200) handedOverTo?: string | null;
+  @IsOptional() @IsString() @MaxLength(80) province?: string | null;
 }
 
 export class CreateRahcomSystemActivityDto {

@@ -92,6 +92,19 @@ export class DepartmentStructureService {
     return { ...details, roles };
   }
 
+  async getBranchEmployees(branchId: string, user: AuthenticatedUser) {
+    const branch = await this.prisma.branch.findUnique({ where: { id: branchId }, select: { id: true, organizationId: true } });
+    if (!branch) throw new NotFoundException('دفتر موردنظر پیدا نشد.');
+    const access = await this.settingsService.getOrganizationAccess(branch.organizationId, user);
+    if (!access.canView) throw new ForbiddenException('مجوز مشاهده ساختار سازمانی را ندارید.');
+    const employees = await this.prisma.employee.findMany({
+      where: { organizationId: branch.organizationId, branchId },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
+      select: employeeSummarySelect(branch.organizationId),
+    });
+    return employees.map((employee) => this.employeeSummary(employee));
+  }
+
   async getOverview(departmentId: string, user: AuthenticatedUser) {
     const department = await this.authorizeDepartment(departmentId, user);
     const employeeSelect = employeeSummarySelect(department.organizationId);

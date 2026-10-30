@@ -1,7 +1,7 @@
 /**
  * @file src/core/auth/guards/global-auth.guard.ts
  * @type backend
- * @description گارد سراسری احراز هویت JWT با پشتیبانی از endpointهای عمومی ERP Pro
+ * @description Rahyar backend authentication and setup
  */
 
 import {

@@ -13,6 +13,7 @@ model VisitorPresence {
   visitorId  String   @id
   lastSeenAt DateTime @default(now())
   userAgent  String?
+  label      String?
 
   @@index([lastSeenAt])
   @@map("visitor_presence")
@@ -20,6 +21,7 @@ model VisitorPresence {
 
 model VisitorSession {
   id        String             @id
+  visitorId String?
   ipAddress String
   userAgent String?
   startedAt DateTime           @default(now())
@@ -28,6 +30,7 @@ model VisitorSession {
   pageViews VisitorPageView[]
 
   @@index([ipAddress, startedAt])
+  @@index([visitorId, startedAt])
   @@index([lastSeenAt])
   @@map("visitor_sessions")
 }

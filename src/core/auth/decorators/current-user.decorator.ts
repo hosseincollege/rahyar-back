@@ -1,7 +1,7 @@
 /**
  * @file src/core/auth/decorators/current-user.decorator.ts
  * @type backend
- * @description دکوراتور دسترسی به کاربر احراز هویت‌شده در endpointهای ERP Pro
+ * @description Rahyar backend authentication and setup
  */
 
 import {

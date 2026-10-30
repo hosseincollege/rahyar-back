@@ -1,7 +1,8 @@
-import { Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { CurrentUser } from '../core/auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
 import { DevelopmentService } from './development.service';
+import { UpdateVisitorDeviceLabelDto } from './dto/update-visitor-device-label.dto';
 
 @Controller('development')
 export class DevelopmentController {
@@ -17,13 +18,22 @@ export class DevelopmentController {
     return this.developmentService.getSiteVisits(user, range, page, search);
   }
 
-  @Get('site-visits/:ipAddress')
+  @Get('site-visits/:visitorKey')
   getSiteVisitorDetails(
     @CurrentUser() user: AuthenticatedUser,
-    @Param('ipAddress') ipAddress: string,
+    @Param('visitorKey') visitorKey: string,
     @Query('range') range = '7d',
   ) {
-    return this.developmentService.getSiteVisitorDetails(user, ipAddress, range);
+    return this.developmentService.getSiteVisitorDetails(user, visitorKey, range);
+  }
+
+  @Put('site-visits/devices/:visitorId/label')
+  updateSiteVisitorDeviceLabel(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('visitorId') visitorId: string,
+    @Body() dto: UpdateVisitorDeviceLabelDto,
+  ) {
+    return this.developmentService.updateSiteVisitorDeviceLabel(user, visitorId, dto.label);
   }
 
   @Get('accounts')

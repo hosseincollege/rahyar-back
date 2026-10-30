@@ -1,7 +1,7 @@
 /**
  * @file src/core/auth/auth.module.ts
  * @type backend
- * @description ماژول احراز هویت، تنظیم JWT و ثبت گارد سراسری ERP Pro
+ * @description Rahyar backend authentication and setup
  */
 
 import { Module } from '@nestjs/common';

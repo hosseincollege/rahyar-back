@@ -71,6 +71,7 @@ model RahcomSolarSnapshot {
   id               String       @id @default(cuid())
   organizationId   String
   createdById      String
+  province         String?      @db.VarChar(80)
   capturedAt       DateTime     @default(now())
   downText         String       @db.Text
   unreachableText  String       @db.Text
@@ -79,6 +80,7 @@ model RahcomSolarSnapshot {
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, capturedAt])
+  @@index([organizationId, province, capturedAt])
   @@map("rahcom_solar_snapshots")
 }
 
@@ -103,6 +105,7 @@ model RahcomImportedTicket {
   organizationId String
   ticketCode     String       @db.VarChar(100)
   systemCode     String       @default("") @db.VarChar(100)
+  province       String?      @db.VarChar(80)
   summary        String       @db.Text
   customer       String       @default("") @db.Text
   equipment      String       @default("") @db.Text
@@ -117,6 +120,7 @@ model RahcomImportedTicket {
 
   @@unique([organizationId, ticketCode])
   @@index([organizationId, systemCode])
+  @@index([organizationId, province])
   @@index([organizationId, importedAt])
   @@map("rahcom_imported_tickets")
 }

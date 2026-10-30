@@ -66,13 +66,20 @@ export async function seedRahcom(ctx: TestDataContext): Promise<TestDataSeedResu
     const item = activities[index];
     const system = item.systemIndex === null ? null : savedSystems[item.systemIndex];
     const description = `${DEMO_RAHCOM_ACTIVITY_PREFIX} ${item.description}`.trim();
+    const activityId = `demo-rahcom-${ctx.organizationId}-${item.key}`;
+    if (!system) {
+      await ctx.db.rahcomActivity.updateMany({
+        where: { id: activityId, organizationId: ctx.organizationId, systemId: null, provinceSnapshot: null },
+        data: { provinceSnapshot: 'isfahan' },
+      });
+    }
     const record = {
       organizationId: ctx.organizationId,
       createdById: fixtureUserId(ctx, index),
       systemId: system?.id ?? null,
       systemNameSnapshot: system?.systemName ?? null,
       systemCodeSnapshot: system?.systemCode ?? null,
-      provinceSnapshot: system?.province ?? null,
+      provinceSnapshot: system?.province ?? 'isfahan',
       activityDate: fixtureDate(ctx.now, item.daysAgo),
       activityType: 'activityType' in item ? item.activityType : 'SYSTEM_VISIT',
       quantity: 'quantity' in item ? item.quantity : 1,
@@ -83,7 +90,7 @@ export async function seedRahcom(ctx: TestDataContext): Promise<TestDataSeedResu
       createdAt: fixtureDate(ctx.now, item.daysAgo),
     };
     await ctx.db.rahcomActivity.createMany({
-      data: [{ id: `demo-rahcom-${ctx.organizationId}-${item.key}`, ...record }],
+      data: [{ id: activityId, ...record }],
       skipDuplicates: true,
     });
   }

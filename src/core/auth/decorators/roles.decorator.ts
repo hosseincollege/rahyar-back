@@ -1,7 +1,7 @@
 /**
  * @file src/core/auth/decorators/roles.decorator.ts
  * @type backend
- * @description دکوراتور تعیین نقش‌های مجاز برای endpointهای ERP Pro
+ * @description Rahyar backend authentication and setup
  */
 
 import { SetMetadata } from '@nestjs/common';

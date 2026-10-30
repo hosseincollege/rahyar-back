@@ -143,8 +143,8 @@ export class SettingsService {
       const now = new Date();
       await this.prisma.visitorSession.upsert({
         where: { id: sessionId },
-        create: { id: sessionId, ipAddress: ipAddress.slice(0, 100), userAgent: userAgent?.slice(0, 500) ?? null, startedAt: now, lastSeenAt: now },
-        update: { lastSeenAt: now, userAgent: userAgent?.slice(0, 500) ?? null, endedAt: input.event === 'EXIT' ? now : null },
+        create: { id: sessionId, visitorId, ipAddress: ipAddress.slice(0, 100), userAgent: userAgent?.slice(0, 500) ?? null, startedAt: now, lastSeenAt: now },
+        update: { visitorId, ipAddress: ipAddress.slice(0, 100), lastSeenAt: now, userAgent: userAgent?.slice(0, 500) ?? null, endedAt: input.event === 'EXIT' ? now : null },
       });
       if (input.event === 'ENTER') {
         await this.prisma.visitorPageView.upsert({
@@ -281,11 +281,9 @@ export class SettingsService {
           canEdit: true,
           canViewRahcom: true,
           canManageRahcom: true,
-          canViewAccounting: true,
-          canViewHumanResources: true,
         };
       }
-      return { canView: false, canViewSharedSettings: false, canEdit: false, canViewRahcom: false, canManageRahcom: false, canViewAccounting: false, canViewHumanResources: false };
+      return { canView: false, canViewSharedSettings: false, canEdit: false, canViewRahcom: false, canManageRahcom: false };
     }
 
     const isOwner = membership.organization.ownerId === user.id;
@@ -299,11 +297,25 @@ export class SettingsService {
     const canEdit = isOwner || permissions.has('settings.write');
     const canView = canEdit || permissions.has('settings.read');
     const canManageRahcom = isOwner || isOrganizationAdmin;
-    const canViewRahcom = canManageRahcom || isDemoUser;
-    const canViewAccounting = isOwner || isOrganizationAdmin || permissions.has('accounting.read') || permissions.has('accounting.write');
-    const canViewHumanResources = isOwner || isOrganizationAdmin || [...permissions].some((key) => key.startsWith('hr.'));
+    const hasRahcomProvince = canManageRahcom || isDemoUser
+      ? false
+      : await this.hasRahcomProvinceAssignment(id, user.id);
+    const canViewRahcom = canManageRahcom || isDemoUser || hasRahcomProvince;
+    return { canView, canViewSharedSettings: true, canEdit, canViewRahcom, canManageRahcom };
+  }
 
-    return { canView, canViewSharedSettings: true, canEdit, canViewRahcom, canManageRahcom, canViewAccounting, canViewHumanResources };
+  private async hasRahcomProvinceAssignment(organizationId: string, userId: string) {
+    try {
+      const membership = await this.prisma.organizationMember.findUnique({
+        where: { organizationId_userId: { organizationId, userId } },
+        select: { rahcomProvince: true },
+      });
+      return Boolean(membership?.rahcomProvince);
+    } catch (error) {
+      // Keep organization settings available until the province-scope migration is applied.
+      if ((error as { code?: string })?.code === 'P2022') return false;
+      throw error;
+    }
   }
 
   async getShellVisibility(id: string, user: AuthenticatedUser) {
@@ -490,7 +502,12 @@ export class SettingsService {
     return organization;
   }
 
-  async getRoles(organizationId: string) {
+  async getRoles(organizationId: string, user: AuthenticatedUser) {
+    const access = await this.getOrganizationAccess(organizationId, user);
+    if (!access.canView) {
+      throw new ForbiddenException();
+    }
+
     const roles = await this.prisma.role.findMany({
       where: {
         OR: [
@@ -524,8 +541,17 @@ export class SettingsService {
     }));
   }
 
-  async saveRoles(organizationId: string, rolesDto: SaveRoleDto[]) {
-    return this.prisma.$transaction(async (tx) => {
+  async saveRoles(
+    organizationId: string,
+    rolesDto: SaveRoleDto[],
+    user: AuthenticatedUser,
+  ) {
+    const access = await this.getOrganizationAccess(organizationId, user);
+    if (!access.canEdit) {
+      throw new ForbiddenException();
+    }
+
+    await this.prisma.$transaction(async (tx) => {
       const org = await tx.organization.findUnique({
         where: { id: organizationId },
         select: { id: true },
@@ -544,6 +570,13 @@ export class SettingsService {
         let role;
 
         if (item.id) {
+          const existing = await tx.role.findFirst({
+            where: { id: item.id, organizationId, isSystemRole: false },
+            select: { id: true },
+          });
+          if (!existing) {
+            throw new BadRequestException();
+          }
           role = await tx.role.update({
             where: { id: item.id },
             data: {
@@ -603,6 +636,18 @@ export class SettingsService {
         }
       }
 
+      const rolesToDelete = await tx.role.findMany({
+        where: {
+          organizationId,
+          isSystemRole: false,
+          id: { notIn: processedRoleIds },
+        },
+        select: { id: true, _count: { select: { members: true } } },
+      });
+      if (rolesToDelete.some((role) => role._count.members > 0)) {
+        throw new BadRequestException();
+      }
+
       await tx.role.deleteMany({
         where: {
           organizationId,
@@ -611,8 +656,8 @@ export class SettingsService {
         },
       });
 
-      return this.getRoles(organizationId);
     });
+    return this.getRoles(organizationId, user);
   }
 
   async getUsers(organizationId: string, user: AuthenticatedUser) {
@@ -644,6 +689,13 @@ export class SettingsService {
       orderBy: { createdAt: 'desc' },
     });
 
+    const userIds = users.map((u) => u.id);
+    const employeeProfiles = await this.prisma.employee.findMany({
+      where: { organizationId, userId: { in: userIds } },
+      select: { userId: true, branchId: true, departmentId: true, branch: { select: { name: true } }, department: { select: { name: true } } },
+    });
+    const employeeByUser = new Map(employeeProfiles.map((employee) => [employee.userId, employee]));
+
     return users.map((u) => {
       const membership = u.memberships[0];
       const primaryRole = membership?.roles?.[0]?.role;
@@ -660,13 +712,16 @@ export class SettingsService {
         email: u.email,
         phone: u.phone,
         nationalId: u.nationalId,
-        status: u.status,
+        status: u.status === 'ACTIVE' && membership?.status === 'ACTIVE' ? 'ACTIVE' : 'DISABLED',
         isSystemUser: u.isSystemUser,
         role: roleName,
         roleKey: roleKey,
         roles: membership?.roles?.map((r) => r.role.key) || [roleKey],
-        department: 'عمومی',
-        isActive: u.status === 'ACTIVE',
+        branchId: employeeByUser.get(u.id)?.branchId ?? null,
+        branchName: employeeByUser.get(u.id)?.branch?.name ?? null,
+        departmentId: employeeByUser.get(u.id)?.departmentId ?? null,
+        department: employeeByUser.get(u.id)?.department?.name ?? 'عمومی',
+        isActive: u.status === 'ACTIVE' && membership?.status === 'ACTIVE',
       };
     });
   }
@@ -684,7 +739,7 @@ export class SettingsService {
       throw new ForbiddenException('مجوز ویرایش کاربران این سازمان را ندارید.');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       const org = await tx.organization.findUnique({
         where: { id: organizationId },
         select: { id: true, ownerId: true },
@@ -714,6 +769,13 @@ export class SettingsService {
         if (!user && item.username) {
           user = await tx.user.findUnique({ where: { username: item.username.trim() } });
         }
+
+        const previousMembership = user
+          ? await tx.organizationMember.findUnique({
+              where: { organizationId_userId: { organizationId, userId: user.id } },
+              select: { status: true },
+            })
+          : null;
 
         const fullName = (item.name || item.fullName || '').trim();
         let derivedFirstName = item.firstName;
@@ -774,7 +836,6 @@ export class SettingsService {
             lastName,
             ...(item.phone !== undefined && { phone: item.phone }),
             ...(item.nationalId !== undefined || item.nationalCode !== undefined ? { nationalId } : {}),
-            status: userStatus,
           };
 
           if (item.username && item.username.trim() !== user.username) {
@@ -817,7 +878,6 @@ export class SettingsService {
             joinedAt: new Date(),
           },
         });
-
         if (membershipStatus === 'ACTIVE') {
           const existingProfile = await tx.employee.findFirst({
             where: { organizationId, userId: user.id },
@@ -840,6 +900,26 @@ export class SettingsService {
                 data: { userId: user.id },
               });
             }
+          }
+          const profile = await tx.employee.findFirst({ where: { organizationId, userId: user.id }, select: { id: true } });
+          let assignedBranchId = item.branchId || null;
+          const assignedDepartmentId = item.departmentId || null;
+          if (assignedDepartmentId) {
+            const department = await tx.department.findFirst({ where: { id: assignedDepartmentId, organizationId }, select: { id: true, branchId: true } });
+            if (!department || (assignedBranchId && department.branchId && department.branchId !== assignedBranchId)) throw new BadRequestException('واحد انتخاب‌شده با دفتر انتخابی سازگار نیست.');
+            if (!assignedBranchId) assignedBranchId = department.branchId;
+          }
+          if (assignedBranchId && !(await tx.branch.findFirst({ where: { id: assignedBranchId, organizationId }, select: { id: true } }))) throw new BadRequestException('دفتر انتخاب‌شده معتبر نیست.');
+          if (!profile && (item.branchId || item.departmentId)) {
+            const employeeCode = `USR-${user.id.slice(-12).toUpperCase()}`;
+            await tx.employee.create({ data: {
+              organizationId, userId: user.id, employeeCode,
+              firstName, lastName, nationalId: nationalId || null,
+              email: user.email, phone: user.phone, hiredAt: new Date(),
+              branchId: assignedBranchId, departmentId: assignedDepartmentId,
+            } });
+          } else if (profile && (item.branchId !== undefined || item.departmentId !== undefined)) {
+            await tx.employee.update({ where: { id: profile.id }, data: { branchId: assignedBranchId, departmentId: assignedDepartmentId } });
           }
         }
 
@@ -901,7 +981,7 @@ export class SettingsService {
               ...(previousUser!.email !== user.email ? ['email'] : []),
               ...(previousUser!.phone !== user.phone ? ['phone'] : []),
               ...(previousUser!.nationalId !== user.nationalId ? ['nationalId'] : []),
-              ...(previousUser!.status !== user.status ? ['status'] : []),
+              ...(previousMembership?.status !== membershipStatus ? ['membershipStatus'] : []),
               ...(roleChanged ? ['roles'] : []),
               ...(typeof item.password === 'string' && item.password.trim().length > 0 ? ['password'] : []),
             ];
@@ -909,8 +989,8 @@ export class SettingsService {
         if (changedFields.length > 0) {
           const action = isNewUser
             ? AuditAction.CREATE
-            : previousUser!.status !== user.status
-              ? user.status === 'ACTIVE' ? AuditAction.ACTIVATE : AuditAction.DISABLE
+            : previousMembership?.status !== membershipStatus
+              ? membershipStatus === 'ACTIVE' ? AuditAction.ACTIVATE : AuditAction.DISABLE
               : AuditAction.UPDATE;
           await tx.auditLog.create({
             data: {
@@ -929,8 +1009,45 @@ export class SettingsService {
         }
       }
 
-      return this.getUsers(organizationId, actor);
     });
+    return this.getUsers(organizationId, actor);
+  }
+
+  async removeOrganizationUser(
+    organizationId: string,
+    userId: string,
+    actor: AuthenticatedUser,
+  ) {
+    const access = await this.getOrganizationAccess(organizationId, actor);
+    if (!access.canEdit) throw new ForbiddenException();
+
+    await this.prisma.$transaction(async (tx) => {
+      const [organization, membership] = await Promise.all([
+        tx.organization.findUnique({ where: { id: organizationId }, select: { ownerId: true } }),
+        tx.organizationMember.findUnique({
+          where: { organizationId_userId: { organizationId, userId } },
+          select: { id: true, userId: true, user: { select: { username: true, isSystemUser: true } } },
+        }),
+      ]);
+      if (!membership) throw new NotFoundException();
+      if (membership.user.isSystemUser || organization?.ownerId === userId) {
+        throw new BadRequestException();
+      }
+
+      await tx.organizationMember.delete({ where: { id: membership.id } });
+      await tx.auditLog.create({
+        data: {
+          organizationId,
+          userId: actor.id,
+          action: AuditAction.DELETE,
+          entity: 'ORGANIZATION_MEMBER',
+          entityId: membership.userId,
+          metadata: { username: membership.user.username },
+        },
+      });
+    });
+
+    return this.getUsers(organizationId, actor);
   }
 
   async updateOrganizationSettings(

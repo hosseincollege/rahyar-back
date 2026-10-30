@@ -41,10 +41,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
   ) {
-    const jwtSecret =
-      configService.get<string>('JWT_SECRET') ||
-      process.env.JWT_SECRET ||
-      'erp-pro-secret';
+    const jwtSecret = configService.get<string>('JWT_SECRET') ?? process.env.JWT_SECRET;
+    if (!jwtSecret) throw new Error('JWT_SECRET is required to validate Rahyar sessions.');
 
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),

@@ -77,6 +77,20 @@ export async function seedSettings(ctx: TestDataContext): Promise<TestDataCounts
     savedBranches.push(branch);
   }
 
+  const organizationalUnits = [
+    { branchId: savedBranches[0].id, code: 'DEMO-UNIT-ISFAHAN-OPERATIONS', name: 'عملیات استان اصفهان' },
+    { branchId: savedBranches[0].id, code: 'DEMO-UNIT-ISFAHAN-SUPPORT', name: 'پشتیبانی استان اصفهان' },
+    { branchId: savedBranches[1].id, code: 'DEMO-UNIT-TEHRAN-OPERATIONS', name: 'عملیات استان تهران' },
+    { branchId: savedBranches[1].id, code: 'DEMO-UNIT-TEHRAN-SUPPORT', name: 'پشتیبانی استان تهران' },
+  ];
+  for (const unit of organizationalUnits) {
+    await ctx.db.department.upsert({
+      where: { organizationId_code: { organizationId: ctx.organizationId, code: unit.code } },
+      create: { organizationId: ctx.organizationId, ...unit },
+      update: {},
+    });
+  }
+
   const announcements = [
     ['برنامه نگهداری سامانه در پنجشنبه شب', 'به‌روزرسانی زیرساخت از ساعت ۲۲ تا ۲۳ انجام می‌شود؛ لطفاً عملیات مالی را پیش از این زمان ثبت کنید.'],
     ['دوره آموزشی سامانه فروش', 'کارگاه کار با فرایند ثبت سفارش و پیگیری مشتریان روز دوشنبه ساعت ۱۰ در شعبه کرج برگزار می‌شود.'],
@@ -112,5 +126,5 @@ export async function seedSettings(ctx: TestDataContext): Promise<TestDataCounts
       branchId: index === 1 ? savedBranches[1].id : null,
     } });
   }
-  return { organizationSettings: 1, branches: branches.length, departments: 0, announcements: announcements.length };
+  return { organizationSettings: 1, branches: branches.length, departments: organizationalUnits.length, announcements: announcements.length };
 }

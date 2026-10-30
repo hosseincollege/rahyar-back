@@ -1,6 +1,6 @@
 /**
  * @file src/main.ts
- * @description ERP Pro backend bootstrap configuration for local and Vercel
+ * @description Rahyar backend bootstrap configuration for local and Vercel
  */
 
 import { Logger, ValidationPipe } from '@nestjs/common';
@@ -16,11 +16,13 @@ server.use('/uploads', express.static(resolve(process.cwd(), 'uploads')));
 let initializationPromise: Promise<void> | null = null;
 
 const allowedOrigins = [
-  'https://erp-front-opal.vercel.app',
-  'http://localhost:3000',
+  'https://rahyar-front.vercel.app',
   'http://localhost:3015',
-  'http://127.0.0.1:3000',
   'http://127.0.0.1:3015',
+  ...(process.env.RAHYAR_FRONTEND_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
 ];
 
 async function createNestApp(expressInstance: Express): Promise<void> {
@@ -34,13 +36,7 @@ async function createNestApp(expressInstance: Express): Promise<void> {
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   app.enableCors({
-    origin: (origin, callback) => {
-      // درخواست‌های بدون Origin یا منطبق با دامنه‌های مجاز و زیردامنه‌های ورسل
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
-        return callback(null, true);
-      }
-      return callback(null, false);
-    },
+    origin: [...allowedOrigins],
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Origin',
@@ -87,10 +83,10 @@ if (process.env.VERCEL !== '1') {
       await initializeNestApp();
       const port = Number(process.env.PORT) || 3016;
       server.listen(port, () => {
-        logger.log(`ERP Pro API is running on port ${port}`);
+        logger.log(`Rahyar API is running on port ${port}`);
       });
     } catch (error) {
-      logger.error('Failed to start ERP Pro API', error);
+      logger.error('Failed to start Rahyar API', error);
       process.exitCode = 1;
     }
   })();

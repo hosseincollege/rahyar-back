@@ -10,7 +10,6 @@ import { JwtService } from '@nestjs/jwt';
 import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
 import { PrismaService } from '../core/prisma/prisma.service';
 import { isTestDataModuleKey, seedTestDataModule, TEST_DATA_MODULES } from './test-data';
-import { seedSupply } from './test-data/supply';
 import type { TestDataContext, TestDataCounts } from './test-data/context';
 
 @Injectable()
@@ -33,17 +32,27 @@ export class DevelopmentService {
     if (rangeValue !== 'all' && !(rangeValue in ranges)) throw new BadRequestException('بازه زمانی معتبر نیست.');
     const page = Math.max(1, Math.min(10000, Number.parseInt(pageValue, 10) || 1));
     const since = rangeValue === 'all' ? undefined : new Date(Date.now() - ranges[rangeValue as keyof typeof ranges] * 86400000);
-    const where = { ...(since ? { startedAt: { gte: since } } : {}), ...(search.trim() ? { ipAddress: { contains: search.trim().slice(0, 100) } } : {}) };
+    const searchTerm = search.trim().slice(0, 100);
+    const matchingLabels = searchTerm ? await this.prisma.visitorPresence.findMany({ where: { label: { contains: searchTerm, mode: 'insensitive' } }, select: { visitorId: true }, take: 1000 }) : [];
+    const where = { ...(since ? { startedAt: { gte: since } } : {}), ...(searchTerm ? { OR: [{ ipAddress: { contains: searchTerm } }, ...(matchingLabels.length ? [{ visitorId: { in: matchingLabels.map(({ visitorId }) => visitorId) } }] : [])] } : {}) };
     const onlineSince = new Date(Date.now() - 5 * 60_000);
-    const [groups, totalGroups, sessionCount, pageViewCount, activeIpGroups] = await Promise.all([
-      this.prisma.visitorSession.groupBy({ by: ['ipAddress'], where, _count: { _all: true }, _max: { lastSeenAt: true }, orderBy: { _max: { lastSeenAt: 'desc' } }, skip: (page - 1) * 25, take: 25 }),
-      this.prisma.visitorSession.groupBy({ by: ['ipAddress'], where, _count: { _all: true }, orderBy: { _max: { lastSeenAt: 'desc' } }, take: 100000 }),
+    const [devices, legacyIps, uniqueIps, sessionCount, pageViewCount, activeDevices, activeLegacyIps] = await Promise.all([
+      this.prisma.visitorSession.groupBy({ by: ['visitorId'], where: { ...where, visitorId: { not: null } }, _count: { _all: true }, _max: { lastSeenAt: true }, orderBy: { _max: { lastSeenAt: 'desc' } }, take: 100000 }),
+      this.prisma.visitorSession.groupBy({ by: ['ipAddress'], where: { ...where, visitorId: null }, _count: { _all: true }, _max: { lastSeenAt: true }, orderBy: { _max: { lastSeenAt: 'desc' } }, take: 100000 }),
+      this.prisma.visitorSession.groupBy({ by: ['ipAddress'], where, _count: { _all: true }, _max: { lastSeenAt: true }, orderBy: { _max: { lastSeenAt: 'desc' } }, take: 100000 }),
       this.prisma.visitorSession.count({ where }),
       this.prisma.visitorPageView.count({ where: { session: where } }),
-      this.prisma.visitorSession.groupBy({ by: ['ipAddress'], where: { ...where, lastSeenAt: { gte: onlineSince } }, _count: { _all: true }, orderBy: { _max: { lastSeenAt: 'desc' } }, take: 100000 }),
+      this.prisma.visitorSession.groupBy({ by: ['visitorId'], where: { ...where, visitorId: { not: null }, lastSeenAt: { gte: onlineSince } }, _count: { _all: true }, _max: { lastSeenAt: true }, orderBy: { _max: { lastSeenAt: 'desc' } }, take: 100000 }),
+      this.prisma.visitorSession.groupBy({ by: ['ipAddress'], where: { ...where, visitorId: null, lastSeenAt: { gte: onlineSince } }, _count: { _all: true }, _max: { lastSeenAt: true }, orderBy: { _max: { lastSeenAt: 'desc' } }, take: 100000 }),
     ]);
-    const ips = groups.map((group) => group.ipAddress);
-    const sessions = ips.length ? await this.prisma.visitorSession.findMany({ where: { ...where, ipAddress: { in: ips } }, select: { id: true, ipAddress: true, lastSeenAt: true }, take: 20000 }) : [];
+    const allGroups = [
+      ...devices.map((item) => ({ key: `device:${item.visitorId}`, visitorId: item.visitorId, ipAddress: '', count: item._count._all, lastSeenAt: item._max.lastSeenAt })),
+      ...legacyIps.map((item) => ({ key: `legacy:${item.ipAddress}`, visitorId: null, ipAddress: item.ipAddress, count: item._count._all, lastSeenAt: item._max.lastSeenAt })),
+    ].sort((a, b) => (b.lastSeenAt?.getTime() ?? 0) - (a.lastSeenAt?.getTime() ?? 0));
+    const groups = allGroups.slice((page - 1) * 25, page * 25);
+    const ids = groups.flatMap((item) => item.visitorId ? [item.visitorId] : []);
+    const ips = groups.flatMap((item) => item.visitorId ? [] : [item.ipAddress]);
+    const sessions = groups.length ? await this.prisma.visitorSession.findMany({ where: { AND: [where, { OR: [...(ids.length ? [{ visitorId: { in: ids } }] : []), ...(ips.length ? [{ visitorId: null, ipAddress: { in: ips } }] : [])] }] }, orderBy: { lastSeenAt: 'desc' }, select: { id: true, visitorId: true, ipAddress: true, lastSeenAt: true }, take: 20000 }) : [];
     const sessionIds = sessions.map(({ id }) => id);
     const pages = sessionIds.length ? await this.prisma.visitorPageView.findMany({ where: { sessionId: { in: sessionIds } }, select: { sessionId: true, moduleKey: true, durationSeconds: true } }) : [];
     const pageStats = new Map<string, { count: number; seconds: number; modules: Set<string> }>();
@@ -51,38 +60,58 @@ export class DevelopmentService {
       const stat = pageStats.get(view.sessionId) ?? { count: 0, seconds: 0, modules: new Set<string>() };
       stat.count += 1; stat.seconds += view.durationSeconds; stat.modules.add(view.moduleKey); pageStats.set(view.sessionId, stat);
     }
-    const sessionStats = new Map<string, { visits: number; pageViews: number; seconds: number; modules: Set<string> }>();
+    const sessionStats = new Map<string, { visits: number; pageViews: number; seconds: number; modules: Set<string>; ips: Set<string> }>();
     for (const session of sessions) {
-      const stat = sessionStats.get(session.ipAddress) ?? { visits: 0, pageViews: 0, seconds: 0, modules: new Set<string>() };
+      const key = session.visitorId ? `device:${session.visitorId}` : `legacy:${session.ipAddress}`;
+      const stat = sessionStats.get(key) ?? { visits: 0, pageViews: 0, seconds: 0, modules: new Set<string>(), ips: new Set<string>() };
       const pageStat = pageStats.get(session.id);
       stat.visits += 1; stat.pageViews += pageStat?.count ?? 0; stat.seconds += pageStat?.seconds ?? 0;
+      stat.ips.add(session.ipAddress);
       pageStat?.modules.forEach((module) => stat.modules.add(module));
-      sessionStats.set(session.ipAddress, stat);
+      sessionStats.set(key, stat);
     }
+    const identities = ids.length ? await this.prisma.visitorPresence.findMany({ where: { visitorId: { in: ids } }, select: { visitorId: true, label: true, userAgent: true } }) : [];
+    const identityById = new Map(identities.map((identity) => [identity.visitorId, identity]));
     return {
       available: true,
-      summary: { onlineVisitors: activeIpGroups.length, uniqueIps: totalGroups.length, sessions: sessionCount, pageViews: pageViewCount },
+      summary: { onlineVisitors: activeDevices.length + activeLegacyIps.length, uniqueIps: uniqueIps.length, devices: devices.length + legacyIps.length, sessions: sessionCount, pageViews: pageViewCount },
       visitors: groups.map((group) => {
-        const stat = sessionStats.get(group.ipAddress);
-        const latest = group._max.lastSeenAt;
-        return { ipAddress: group.ipAddress, visits: group._count._all, pageViews: stat?.pageViews ?? 0, durationSeconds: stat?.seconds ?? 0, modules: [...(stat?.modules ?? [])], lastSeenAt: latest?.toISOString() ?? null, online: Boolean(latest && latest.getTime() >= Date.now() - 5 * 60_000) };
+        const stat = sessionStats.get(group.key);
+        const identity = group.visitorId ? identityById.get(group.visitorId) : null;
+        const latest = group.lastSeenAt;
+        return { id: group.key, visitorId: group.visitorId, label: identity?.label ?? null, userAgent: identity?.userAgent ?? null, ipAddress: stat ? [...stat.ips][0] ?? group.ipAddress : group.ipAddress, ipAddresses: [...(stat?.ips ?? [])], visits: group.count, pageViews: stat?.pageViews ?? 0, durationSeconds: stat?.seconds ?? 0, modules: [...(stat?.modules ?? [])], lastSeenAt: latest?.toISOString() ?? null, online: Boolean(latest && latest.getTime() >= Date.now() - 5 * 60_000) };
       }),
-      page, pageSize: 25, totalVisitors: totalGroups.length,
+      page, pageSize: 25, totalVisitors: allGroups.length,
     };
   }
 
-  async getSiteVisitorDetails(actor: AuthenticatedUser, ipAddress: string, rangeValue = '7d') {
+  async getSiteVisitorDetails(actor: AuthenticatedUser, visitorKey: string, rangeValue = '7d') {
     await this.requireAdministrator(actor);
     if (!this.siteVisitsAvailable()) return { available: false, sessions: [] };
     const ranges = { '7d': 7, '30d': 30, '90d': 90 } as const;
     if (rangeValue !== 'all' && !(rangeValue in ranges)) throw new BadRequestException('بازه زمانی معتبر نیست.');
     const since = rangeValue === 'all' ? undefined : new Date(Date.now() - ranges[rangeValue as keyof typeof ranges] * 86400000);
+    const isLegacy = visitorKey.startsWith('legacy:');
+    const key = visitorKey.slice(7, 200);
     const sessions = await this.prisma.visitorSession.findMany({
-      where: { ipAddress: ipAddress.slice(0, 100), ...(since ? { startedAt: { gte: since } } : {}) },
+      where: { ...(isLegacy ? { visitorId: null, ipAddress: key } : { visitorId: key }), ...(since ? { startedAt: { gte: since } } : {}) },
       orderBy: { startedAt: 'desc' }, take: 500,
-      select: { id: true, startedAt: true, lastSeenAt: true, endedAt: true, pageViews: { orderBy: { enteredAt: 'asc' }, select: { path: true, moduleKey: true, enteredAt: true, leftAt: true, durationSeconds: true } } },
+      select: { id: true, ipAddress: true, startedAt: true, lastSeenAt: true, endedAt: true, pageViews: { orderBy: { enteredAt: 'asc' }, select: { path: true, moduleKey: true, enteredAt: true, leftAt: true, durationSeconds: true } } },
     });
     return { available: true, sessions: sessions.map((session) => ({ ...session, startedAt: session.startedAt.toISOString(), lastSeenAt: session.lastSeenAt.toISOString(), endedAt: session.endedAt?.toISOString() ?? null, pageViews: session.pageViews.map((view) => ({ ...view, enteredAt: view.enteredAt.toISOString(), leftAt: view.leftAt?.toISOString() ?? null })) })) };
+  }
+
+  async updateSiteVisitorDeviceLabel(actor: AuthenticatedUser, visitorId: string, label: string) {
+    await this.requireAdministrator(actor);
+    if (!this.siteVisitsAvailable()) return { available: false };
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(visitorId)) {
+      throw new BadRequestException('شناسه دستگاه معتبر نیست.');
+    }
+    const device = await this.prisma.visitorPresence.findUnique({ where: { visitorId }, select: { visitorId: true } });
+    if (!device) throw new NotFoundException('دستگاه پیدا نشد.');
+    const normalizedLabel = label.trim().slice(0, 80);
+    await this.prisma.visitorPresence.update({ where: { visitorId }, data: { label: normalizedLabel || null } });
+    return { available: true, visitorId, label: normalizedLabel || null };
   }
 
   async getTestDataStatus(actor: AuthenticatedUser) {
@@ -92,13 +121,9 @@ export class DevelopmentService {
     return {
       modules: TEST_DATA_MODULES.map((moduleKey) => {
         const run = byModule.get(moduleKey);
-        const legacySupplyRun = moduleKey === 'commerce' ? byModule.get('supply') : undefined;
-        const counts = {
-          ...((run?.recordCounts ?? {}) as Record<string, number>),
-          ...((legacySupplyRun?.recordCounts ?? {}) as Record<string, number>),
-        };
-        const progressRuns = [run, legacySupplyRun].filter((item) => item !== undefined);
-        const applied = Boolean(run && (moduleKey !== 'commerce' || legacySupplyRun));
+        const counts = { ...((run?.recordCounts ?? {}) as Record<string, number>) };
+        const progressRuns = [run].filter((item) => item !== undefined);
+        const applied = Boolean(run);
         return {
           moduleKey,
           applied,
@@ -136,17 +161,13 @@ export class DevelopmentService {
         now: new Date(),
       };
       const crmCounts = await seedTestDataModule(moduleKey, context);
-      const inventoryCounts = moduleKey === 'commerce'
-        ? await seedSupply(context)
-        : null;
-      const counts = inventoryCounts ? { ...crmCounts, ...inventoryCounts } : crmCounts;
+      const counts = crmCounts;
       const saveProgress = (key: string, recordCounts: TestDataCounts) => db.developmentTestDataRun.upsert({
         where: { organizationId_moduleKey: { organizationId, moduleKey: key } },
         create: { organizationId, appliedById: actor.id, moduleKey: key, recordCounts },
         update: { appliedById: actor.id, recordCounts, appliedAt: new Date() },
       });
       const run = await saveProgress(moduleKey, crmCounts);
-      if (inventoryCounts) await saveProgress('supply', inventoryCounts);
       return {
         moduleKey,
         applied: true,
