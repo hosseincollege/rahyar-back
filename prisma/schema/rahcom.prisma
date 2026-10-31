@@ -108,10 +108,11 @@ model RahcomTrafficSnapshot {
   headers        Json         @db.JsonB
   rows           Json         @db.JsonB
   rowCount       Int
+  snapshotDate   DateTime     @db.Date
   createdAt      DateTime     @default(now())
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@index([organizationId, createdAt])
+  @@index([organizationId, snapshotDate, createdAt])
   @@map("rahcom_traffic_snapshots")
 }
 
@@ -121,6 +122,7 @@ model RahcomImportedTicket {
   ticketCode     String       @db.VarChar(100)
   systemCode     String       @default("") @db.VarChar(100)
   province       String?      @db.VarChar(80)
+  listDate       DateTime     @db.Date
   summary        String       @db.Text
   customer       String       @default("") @db.Text
   equipment      String       @default("") @db.Text
@@ -133,9 +135,29 @@ model RahcomImportedTicket {
   importedAt     DateTime     @default(now())
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@unique([organizationId, ticketCode])
+  @@unique([organizationId, province, listDate, ticketCode])
   @@index([organizationId, systemCode])
   @@index([organizationId, province])
+  @@index([organizationId, province, listDate])
   @@index([organizationId, importedAt])
   @@map("rahcom_imported_tickets")
+}
+
+model RahcomRoadList {
+  id             String       @id @default(cuid())
+  organizationId String
+  createdById    String
+  province       String       @db.VarChar(80)
+  fileName       String       @db.VarChar(255)
+  sheetName      String       @db.VarChar(120)
+  headers        Json         @db.JsonB
+  rows           Json         @db.JsonB
+  rowCount       Int
+  listDate       DateTime     @db.Date
+  importedAt     DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, province, listDate])
+  @@index([organizationId, importedAt])
+  @@map("rahcom_road_lists")
 }

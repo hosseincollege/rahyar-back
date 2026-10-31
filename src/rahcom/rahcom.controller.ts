@@ -11,6 +11,7 @@ import {
   ReplaceRahcomSolarSpecialSystemsDto,
   CreateRahcomTrafficSnapshotDto,
   ImportRahcomTicketsDto,
+  ReplaceRahcomRoadListDto,
   DeleteRahcomSystemsBodyDto,
   DeleteRahcomSystemsQueryDto,
   ImportRahcomSystemsDto,
@@ -79,8 +80,8 @@ export class RahcomController {
     return this.service.deleteSystems(user, { province: query.province, ids: body.ids });
   }
   @Get('systems/:id/activities')
-  listSystemActivities(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.service.listSystemActivities(user, id);
+  listSystemActivities(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Query('date') date: string) {
+    return this.service.listSystemActivities(user, id, date);
   }
   @Post('systems/:id/activities')
   createSystemActivity(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: CreateRahcomSystemActivityDto) {
@@ -96,11 +97,19 @@ export class RahcomController {
   }
   @Get('tickets')
   listImportedTickets(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
-    return this.service.listImportedTickets(user, query.province);
+    return this.service.listImportedTickets(user, query.province, query.date);
   }
   @Post('tickets/import')
   importTickets(@CurrentUser() user: AuthenticatedUser, @Body() body: ImportRahcomTicketsDto) {
     return this.service.importTickets(user, body);
+  }
+  @Get('road-list')
+  getRoadList(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
+    return this.service.getRoadList(user, query.province, query.date);
+  }
+  @Put('road-list')
+  replaceRoadList(@CurrentUser() user: AuthenticatedUser, @Body() body: ReplaceRahcomRoadListDto) {
+    return this.service.replaceRoadList(user, body);
   }
   @Get('members')
   listProvinceAssignments(@CurrentUser() user: AuthenticatedUser) {
@@ -112,7 +121,7 @@ export class RahcomController {
   }
   @Get('solar-snapshots')
   listSolarSnapshots(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
-    return this.service.listSolarSnapshots(user, query.province);
+    return this.service.listSolarSnapshots(user, query.province, query.date);
   }
   @Post('solar-snapshots')
   createSolarSnapshot(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomSolarSnapshotDto) {
@@ -136,19 +145,19 @@ export class RahcomController {
   }
   @Get('traffic-snapshot')
   listTrafficSnapshot(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
-    return this.service.listTrafficSnapshot(user, query.province);
+    return this.service.listTrafficSnapshot(user, query.province, query.date);
   }
   @Get('traffic-snapshot/history')
-  listTrafficSystemHistory(@CurrentUser() user: AuthenticatedUser, @Query('systemCode') systemCode: string) {
-    return this.service.listTrafficSystemHistory(user, systemCode);
+  listTrafficSystemHistory(@CurrentUser() user: AuthenticatedUser, @Query('systemCode') systemCode: string, @Query('date') date: string) {
+    return this.service.listTrafficSystemHistory(user, systemCode, date);
   }
   @Post('traffic-snapshots')
   createTrafficSnapshot(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomTrafficSnapshotDto) {
     return this.service.createTrafficSnapshot(user, body);
   }
   @Post('traffic-snapshot/apply-axes')
-  applyTrafficAxes(@CurrentUser() user: AuthenticatedUser) {
-    return this.service.applyTrafficAxes(user);
+  applyTrafficAxes(@CurrentUser() user: AuthenticatedUser, @Query('date') date: string) {
+    return this.service.applyTrafficAxes(user, date);
   }
   @Delete('activities/:id')
   deleteActivity(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {

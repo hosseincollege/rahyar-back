@@ -70,6 +70,7 @@ export class RahcomActivitiesQueryDto {
 
 export class RahcomProvinceQueryDto {
   @IsOptional() @IsString() @MaxLength(80) province?: string;
+  @IsOptional() @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) date?: string;
 }
 
 export class CreateRahcomAxisDto {
@@ -105,6 +106,7 @@ export class RahcomSolarSpecialSystemDto {
 }
 
 export class CreateRahcomTrafficSnapshotDto {
+  @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) snapshotDate!: string;
   @IsString() @MinLength(1) @MaxLength(255) fileName!: string;
   @IsString() @MinLength(1) @MaxLength(120) sheetName!: string;
   @IsArray() @ArrayMinSize(2) @ArrayMaxSize(50) @IsString({ each: true }) headers!: string[];
@@ -126,9 +128,20 @@ export class RahcomImportedTicketRowDto {
 }
 
 export class ImportRahcomTicketsDto {
+  @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) listDate!: string;
+  @IsString() @MaxLength(80) @Matches(/^[a-z]+(?:-[a-z]+)*$/) province!: string;
   @IsString() @MinLength(1) @MaxLength(255) sourceFileName!: string;
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10000) @ValidateNested({ each: true }) @Type(() => RahcomImportedTicketRowDto)
   tickets!: RahcomImportedTicketRowDto[];
+}
+
+export class ReplaceRahcomRoadListDto {
+  @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) listDate!: string;
+  @IsString() @MinLength(1) @MaxLength(255) fileName!: string;
+  @IsString() @MinLength(1) @MaxLength(120) sheetName!: string;
+  @IsString() @MaxLength(80) @Matches(/^[a-z]+(?:-[a-z]+)*$/) province!: string;
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(100) @IsString({ each: true }) headers!: string[];
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10000) rows!: string[][];
 }
 
 export class UpdateRahcomMemberProvinceDto {
