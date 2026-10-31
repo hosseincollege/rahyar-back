@@ -6,6 +6,7 @@ model RahcomSystem {
   systemCode        String           @db.VarChar(100)
   axis              String?          @db.VarChar(120)
   axisCode          String?          @db.VarChar(100)
+  announcedAxis     String?          @map("announced_axis") @db.VarChar(120)
   incidentType      String?          @db.VarChar(24)
   incidentDetails   String?          @db.VarChar(1000)
   latitude          Float

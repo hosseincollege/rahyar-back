@@ -1,4 +1,4 @@
-﻿ALTER TABLE "rahcom_traffic_snapshots" ADD COLUMN "snapshotDate" DATE;
+ALTER TABLE "rahcom_traffic_snapshots" ADD COLUMN "snapshotDate" DATE;
 UPDATE "rahcom_traffic_snapshots"
 SET "snapshotDate" = ("createdAt" AT TIME ZONE 'Asia/Tehran')::date
 WHERE "snapshotDate" IS NULL;

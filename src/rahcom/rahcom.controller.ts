@@ -18,6 +18,7 @@ import {
   MergeRahcomAxisDto,
   RahcomActivitiesQueryDto,
   RahcomProvinceQueryDto,
+  RahcomTrafficSnapshotDatesQueryDto,
   UpdateRahcomSystemDto,
   UpdateRahcomAxisDto,
   UpdateRahcomMemberProvinceDto,
@@ -107,6 +108,10 @@ export class RahcomController {
   getRoadList(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
     return this.service.getRoadList(user, query.province, query.date);
   }
+  @Get('road-list/dates')
+  getRoadListDates(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomTrafficSnapshotDatesQueryDto) {
+    return this.service.listRoadListDates(user, query.province, query.from, query.to);
+  }
   @Put('road-list')
   replaceRoadList(@CurrentUser() user: AuthenticatedUser, @Body() body: ReplaceRahcomRoadListDto) {
     return this.service.replaceRoadList(user, body);
@@ -146,6 +151,10 @@ export class RahcomController {
   @Get('traffic-snapshot')
   listTrafficSnapshot(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
     return this.service.listTrafficSnapshot(user, query.province, query.date);
+  }
+  @Get('traffic-snapshot/dates')
+  listTrafficSnapshotDates(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomTrafficSnapshotDatesQueryDto) {
+    return this.service.listTrafficSnapshotDates(user, query.province, query.from, query.to);
   }
   @Get('traffic-snapshot/history')
   listTrafficSystemHistory(@CurrentUser() user: AuthenticatedUser, @Query('systemCode') systemCode: string, @Query('date') date: string) {
