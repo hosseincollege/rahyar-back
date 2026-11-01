@@ -5,6 +5,7 @@ import { RolesGuard } from '../core/auth/guards/roles.guard';
 import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
 import {
   CreateRahcomActivityDto,
+  SaveRahcomDailyWorkflowDto,
   CreateRahcomAxisDto,
   CreateRahcomSystemActivityDto,
   CreateRahcomSolarSnapshotDto,
@@ -23,6 +24,7 @@ import {
   UpdateRahcomAxisDto,
   UpdateRahcomMemberProvinceDto,
   UpdateRahcomSelectedProvinceDto,
+  UpdateRahcomImportedTicketDescriptionDto,
 } from './dto/rahcom.dto';
 import { RahcomService } from './rahcom.service';
 
@@ -96,6 +98,10 @@ export class RahcomController {
   createActivity(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomActivityDto) {
     return this.service.createActivity(user, body);
   }
+  @Put('activities/daily-workflow')
+  saveDailyWorkflow(@CurrentUser() user: AuthenticatedUser, @Body() body: SaveRahcomDailyWorkflowDto) {
+    return this.service.saveDailyWorkflow(user, body);
+  }
   @Get('tickets')
   listImportedTickets(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
     return this.service.listImportedTickets(user, query.province, query.date);
@@ -103,6 +109,10 @@ export class RahcomController {
   @Post('tickets/import')
   importTickets(@CurrentUser() user: AuthenticatedUser, @Body() body: ImportRahcomTicketsDto) {
     return this.service.importTickets(user, body);
+  }
+  @Put('tickets/:id/description')
+  updateImportedTicketDescription(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: UpdateRahcomImportedTicketDescriptionDto) {
+    return this.service.updateImportedTicketDescription(user, id, body.description);
   }
   @Get('road-list')
   getRoadList(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {

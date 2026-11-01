@@ -4,6 +4,7 @@ import {
   ArrayNotEmpty,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsNumber,
@@ -143,6 +144,10 @@ export class ImportRahcomTicketsDto {
   tickets!: RahcomImportedTicketRowDto[];
 }
 
+export class UpdateRahcomImportedTicketDescriptionDto {
+  @IsString() @MaxLength(10000) description!: string;
+}
+
 export class ReplaceRahcomRoadListDto {
   @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) listDate!: string;
   @IsString() @MinLength(1) @MaxLength(255) fileName!: string;
@@ -169,6 +174,17 @@ export class CreateRahcomActivityDto {
   @IsOptional() @IsString() @MaxLength(200) accompaniedBy?: string | null;
   @IsOptional() @IsString() @MaxLength(200) handedOverTo?: string | null;
   @IsOptional() @IsString() @MaxLength(80) province?: string | null;
+}
+
+export class SaveRahcomDailyWorkflowDto {
+  @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) date!: string;
+  @IsString() @MinLength(1) @MaxLength(80) province!: string;
+  @IsOptional() @IsString() @MaxLength(10000) systemCodes?: string | null;
+  @IsOptional() @IsString() @MaxLength(10000) visitPlan?: string | null;
+  @IsOptional() @IsString() @MaxLength(10000) completionReport?: string | null;
+  @IsOptional() @IsString() @MaxLength(10000) dailyNote?: string | null;
+  @IsBoolean() excelUpdated!: boolean;
+  @IsOptional() @IsString() @MaxLength(255) excelFileName?: string | null;
 }
 
 export class CreateRahcomSystemActivityDto {

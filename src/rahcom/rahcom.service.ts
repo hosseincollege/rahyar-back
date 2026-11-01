@@ -14,6 +14,7 @@ import type {
   UpdateRahcomAxisDto,
   RahcomActivitiesQueryDto,
   UpdateRahcomSystemDto,
+  SaveRahcomDailyWorkflowDto,
 } from './dto/rahcom.dto';
 import { canonicalRahcomAxisForProvince, defaultIsfahanAxes, isRahcomProvinceId, rahcomProvinceIdFromLabel } from './rahcom-axis';
 
@@ -126,6 +127,27 @@ export class RahcomService {
       orderBy: [{ importedAt: 'desc' }, { ticketCode: 'asc' }],
     });
   }
+  async updateImportedTicketDescription(user: AuthenticatedUser, id: string, description: string) {
+    const access = await this.authorize(user, true);
+    const ticket = await this.prisma.rahcomImportedTicket.findFirst({
+      where: { id, organizationId: access.organizationId },
+      select: { id: true, systemCode: true, province: true },
+    });
+    if (!ticket) throw new NotFoundException('Ticket was not found.');
+    if (!access.isAdmin) {
+      const province = this.scopedProvince(access, ticket.province);
+      if (!province) throw new NotFoundException('Ticket was not found.');
+      if (ticket.province !== province) {
+        const systemCode = String(ticket.systemCode ?? '').trim();
+        const matchingSystem = systemCode ? await this.prisma.rahcomSystem.findFirst({
+          where: { organizationId: access.organizationId, province, systemCode: { equals: systemCode, mode: 'insensitive' } },
+          select: { id: true },
+        }) : null;
+        if (!matchingSystem) throw new NotFoundException('Ticket was not found.');
+      }
+    }
+    return this.prisma.rahcomImportedTicket.update({ where: { id: ticket.id }, data: { description: description.trim() } });
+  }
   async importTickets(user: AuthenticatedUser, body: ImportRahcomTicketsDto) {
     const access = await this.authorize(user, true);
     const province = this.scopedProvince(access, body.province);
@@ -161,6 +183,11 @@ export class RahcomService {
         throw new ForbiddenException(`Ticket ${row.ticketCode} belongs to a different province.`);
       }
     }
+    const savedDescriptions = await this.prisma.rahcomImportedTicket.findMany({
+      where: { organizationId: access.organizationId, province, listDate },
+      select: { ticketCode: true, description: true },
+    });
+    const descriptionsByTicket = new Map(savedDescriptions.map(({ ticketCode, description }) => [ticketCode, description]));
     const rows = body.tickets.map((row) => ({
       organizationId: access.organizationId,
       ticketCode: row.ticketCode.trim(),
@@ -168,6 +195,7 @@ export class RahcomService {
       province,
       listDate,
       summary: row.summary?.trim() ?? '',
+      description: descriptionsByTicket.get(row.ticketCode.trim()) ?? '',
       customer: row.customer?.trim() ?? '',
       equipment: row.equipment?.trim() ?? '',
       type: row.type?.trim() ?? '',
@@ -770,6 +798,34 @@ export class RahcomService {
   }
   createActivity(user: AuthenticatedUser, body: CreateRahcomActivityDto) {
     return this.createAuthorizedActivity(user, body);
+  }
+  async saveDailyWorkflow(user: AuthenticatedUser, body: SaveRahcomDailyWorkflowDto) {
+    const access = await this.authorize(user, 'activity');
+    const { organizationId } = access;
+    const province = this.scopedProvince(access, body.province);
+    if (!province) throw new BadRequestException('Select one province before saving the daily workflow.');
+    const activityDate = this.validDate(body.date);
+    const stages: Array<[string, string | null]> = [
+      ['SYSTEM_CODES', String(body.systemCodes ?? '').trim().slice(0, 10000) || null],
+      ['VISIT_PLAN', String(body.visitPlan ?? '').trim().slice(0, 10000) || null],
+      ['COMPLETION_REPORT', String(body.completionReport ?? '').trim().slice(0, 10000) || null],
+      ['DAILY_NOTE', String(body.dailyNote ?? '').trim().slice(0, 10000) || null],
+      ['EXCEL_UPDATE', body.excelUpdated ? (String(body.excelFileName ?? '').trim().slice(0, 255) || '__COMPLETED__') : null],
+    ];
+    await this.prisma.$transaction(async (tx) => {
+      for (const [activityType, description] of stages) {
+        const where = { organizationId, activityDate, activityType, systemId: null, provinceSnapshot: province };
+        const existing = await tx.rahcomActivity.findFirst({ where, select: { id: true } });
+        if (!description) {
+          await tx.rahcomActivity.deleteMany({ where });
+        } else if (existing) {
+          await tx.rahcomActivity.update({ where: { id: existing.id }, data: { description, performedBy: `${user.firstName} ${user.lastName}`.trim() || user.username } });
+        } else {
+          await tx.rahcomActivity.create({ data: { ...where, createdById: user.id, performedBy: `${user.firstName} ${user.lastName}`.trim() || user.username, quantity: 1, description } });
+        }
+      }
+    });
+    return { saved: true };
   }
   private async createAuthorizedActivity(user: AuthenticatedUser, body: CreateRahcomActivityDto) {
     const access = await this.authorize(user, 'activity');

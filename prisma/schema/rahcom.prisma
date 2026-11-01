@@ -54,7 +54,7 @@ model RahcomActivity {
   activityDate       DateTime      @db.Date
   activityType       String        @db.VarChar(40)
   quantity           Int           @default(1)
-  description        String?       @db.VarChar(1000)
+  description        String?       @db.VarChar(10000)
   accompaniedBy      String?       @db.VarChar(200)
   handedOverTo       String?       @db.VarChar(200)
   performedBy        String?       @db.VarChar(200)
@@ -125,6 +125,7 @@ model RahcomImportedTicket {
   province       String?      @db.VarChar(80)
   listDate       DateTime     @db.Date
   summary        String       @db.Text
+  description    String       @default("") @db.Text
   customer       String       @default("") @db.Text
   equipment      String       @default("") @db.Text
   type           String       @default("") @db.VarChar(120)
