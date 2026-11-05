@@ -4,7 +4,6 @@ model RahcomSystem {
   province          String           @db.VarChar(80)
   systemName        String           @db.VarChar(200)
   systemCode        String           @db.VarChar(100)
-  axis              String?          @db.VarChar(120)
   axisCode          String?          @db.VarChar(100)
   announcedAxis     String?          @map("announced_axis") @db.VarChar(120)
   incidentType      String?          @db.VarChar(24)
@@ -27,20 +26,6 @@ model RahcomSystem {
   @@unique([organizationId, province, systemCode])
   @@index([organizationId, province])
   @@map("rahcom_systems")
-}
-
-model RahcomAxis {
-  id             String       @id @default(cuid())
-  organizationId String
-  province       String       @db.VarChar(80)
-  name           String       @db.VarChar(120)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  @@unique([organizationId, province, name])
-  @@index([organizationId, province])
-  @@map("rahcom_axes")
 }
 
 model RahcomActivity {

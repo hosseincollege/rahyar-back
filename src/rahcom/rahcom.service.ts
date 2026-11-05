@@ -3,7 +3,6 @@ import { PrismaService } from '../core/prisma/prisma.service';
 import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
 import type {
   CreateRahcomActivityDto,
-  CreateRahcomAxisDto,
   CreateRahcomSystemActivityDto,
   CreateRahcomSolarSnapshotDto,
   ReplaceRahcomSolarSpecialSystemsDto,
@@ -11,12 +10,11 @@ import type {
   ImportRahcomTicketsDto,
   ReplaceRahcomRoadListDto,
   ImportRahcomSystemsDto,
-  UpdateRahcomAxisDto,
   RahcomActivitiesQueryDto,
   UpdateRahcomSystemDto,
   SaveRahcomDailyWorkflowDto,
 } from './dto/rahcom.dto';
-import { canonicalRahcomAxisForProvince, defaultIsfahanAxes, isRahcomProvinceId, rahcomProvinceIdFromLabel } from './rahcom-axis';
+import { isRahcomProvinceId, rahcomProvinceIdFromLabel } from './rahcom-axis';
 
 type RahcomAccess = { organizationId: string; memberId: string | null; demoOnly: boolean; isAdmin: boolean; province: string | null; selectedProvince: string | null };
 
@@ -300,94 +298,6 @@ export class RahcomService {
     const member = await this.prisma.organizationMember.findFirst({ where: { id: memberId, organizationId: access.organizationId, status: 'ACTIVE' }, select: { id: true } });
     if (!member) throw new NotFoundException('Active organization member not found.');
     return this.prisma.organizationMember.update({ where: { id: member.id }, data: { rahcomProvince: normalized }, select: { id: true, rahcomProvince: true } });
-  }
-  async listAxes(user: AuthenticatedUser, province?: string) {
-    const access = await this.authorize(user);
-    const { organizationId, demoOnly } = access;
-    const selectedProvince = this.scopedProvince(access, province) ?? '';
-    if (!selectedProvince || selectedProvince.length > 80) throw new BadRequestException('Select a province to list its axes.');
-    const [systems, savedAxes] = await Promise.all([
-      this.prisma.rahcomSystem.findMany({
-        where: { organizationId, province: selectedProvince, ...(demoOnly ? { systemCode: { startsWith: this.demoSystemPrefix } } : {}) },
-        select: { axis: true, announcedAxis: true },
-      }),
-      this.prisma.rahcomAxis.findMany({ where: { organizationId, province: selectedProvince }, select: { id: true } }),
-    ]);
-    const normalizeLegacy = savedAxes.length === 0;
-    const normalizedByLegacy = new Map<string, string>();
-    for (const system of systems) {
-      const legacyName = String(system.axis ?? '').trim();
-      if (legacyName && system.announcedAxis && legacyName === system.announcedAxis) continue;
-      if (legacyName) normalizedByLegacy.set(legacyName, normalizeLegacy ? canonicalRahcomAxisForProvince(selectedProvince, legacyName) : legacyName);
-    }
-    const names = [...new Set([
-      ...(normalizeLegacy && selectedProvince === 'isfahan' ? defaultIsfahanAxes : []),
-      ...normalizedByLegacy.values(),
-    ])].filter(Boolean);
-    if (demoOnly) return names.map((name) => ({ id: `demo:${name}`, organizationId, province: selectedProvince, name }));
-
-    if (names.length) {
-      await this.prisma.rahcomAxis.createMany({ data: names.map((name) => ({ organizationId, province: selectedProvince, name })), skipDuplicates: true });
-      if (normalizeLegacy) for (const [legacyName, name] of normalizedByLegacy) {
-        if (legacyName !== name) await this.prisma.rahcomSystem.updateMany({ where: { organizationId, province: selectedProvince, axis: legacyName }, data: { axis: name } });
-      }
-    }
-    return this.prisma.rahcomAxis.findMany({ where: { organizationId, province: selectedProvince }, orderBy: { name: 'asc' } });
-  }
-  async createAxis(user: AuthenticatedUser, body: CreateRahcomAxisDto) {
-    const access = await this.authorize(user, true);
-    const organizationId = access.organizationId;
-    const province = this.scopedProvince(access, String(body.province ?? '').trim()) ?? '';
-    const name = String(body.name ?? '').trim();
-    if (!province || province.length > 80 || !name || name.length > 120) throw new BadRequestException('Provide a province and an axis name.');
-    const duplicate = await this.prisma.rahcomAxis.findFirst({ where: { organizationId, province, name } });
-    if (duplicate) throw new BadRequestException('An axis with this name already exists in the province.');
-    return this.prisma.rahcomAxis.create({ data: { organizationId, province, name } });
-  }
-  async updateAxis(user: AuthenticatedUser, id: string, requestedName: UpdateRahcomAxisDto['name']) {
-    const access = await this.authorize(user, true);
-    const { organizationId } = access;
-    const name = String(requestedName ?? '').trim();
-    if (!name || name.length > 120) throw new BadRequestException('Provide a valid axis name.');
-    const existing = await this.prisma.rahcomAxis.findFirst({ where: { id, organizationId } });
-    if (!existing) throw new NotFoundException('Axis not found.');
-    this.scopedProvince(access, existing.province);
-    if (existing.name === name) return existing;
-    const duplicate = await this.prisma.rahcomAxis.findFirst({ where: { organizationId, province: existing.province, name } });
-    if (duplicate) throw new BadRequestException('An axis with this name already exists in the province.');
-    return this.prisma.$transaction(async (tx) => {
-      await tx.rahcomSystem.updateMany({ where: { organizationId, province: existing.province, axis: existing.name }, data: { axis: name } });
-      return tx.rahcomAxis.update({ where: { id }, data: { name } });
-    });
-  }
-  async deleteAxis(user: AuthenticatedUser, id: string) {
-    const access = await this.authorize(user, true);
-    const { organizationId } = access;
-    const existing = await this.prisma.rahcomAxis.findFirst({ where: { id, organizationId } });
-    if (!existing) throw new NotFoundException('Axis not found.');
-    this.scopedProvince(access, existing.province);
-    await this.prisma.$transaction(async (tx) => {
-      await tx.rahcomSystem.updateMany({ where: { organizationId, province: existing.province, axis: existing.name }, data: { axis: null } });
-      await tx.rahcomAxis.delete({ where: { id } });
-    });
-    return { deleted: true };
-  }
-  async mergeAxis(user: AuthenticatedUser, sourceId: string, targetId: string) {
-    const access = await this.authorize(user, true);
-    const { organizationId } = access;
-    if (sourceId === targetId) throw new BadRequestException('Choose a different target axis.');
-    const [source, target] = await Promise.all([
-      this.prisma.rahcomAxis.findFirst({ where: { id: sourceId, organizationId } }),
-      this.prisma.rahcomAxis.findFirst({ where: { id: targetId, organizationId } }),
-    ]);
-    if (!source || !target) throw new NotFoundException('Axis not found.');
-    this.scopedProvince(access, source.province);
-    if (source.province !== target.province) throw new BadRequestException('Axes can only be merged within the same province.');
-    await this.prisma.$transaction(async (tx) => {
-      await tx.rahcomSystem.updateMany({ where: { organizationId, province: source.province, axis: source.name }, data: { axis: target.name } });
-      await tx.rahcomAxis.delete({ where: { id: source.id } });
-    });
-    return { merged: true, targetAxis: target };
   }
   async listSolarSnapshots(user: AuthenticatedUser, requestedProvince?: string, requestedDate?: string) {
     const access = await this.authorize(user);
@@ -675,9 +585,8 @@ export class RahcomService {
     const { organizationId, demoOnly } = access;
     const province = this.scopedProvince(access, String(body?.province ?? '').trim()) ?? '';
     if (!province || province.length > 80 || !Array.isArray(body?.systems) || body.systems.length > 10000) throw new BadRequestException('Select a province and provide at most 10,000 rows.');
-    const configuredAxes = new Set((await this.prisma.rahcomAxis.findMany({ where: { organizationId, province }, select: { name: true } })).map(({ name }) => name));
     const rows = body.systems.map((raw, index): {
-      organizationId: string; province: string; systemName: string; systemCode: string; latitude: number; longitude: number; axis?: string | null; axisCode?: string | null; announcedAxis?: string | null;
+      organizationId: string; province: string; systemName: string; systemCode: string; latitude: number; longitude: number; axisCode?: string | null; announcedAxis?: string | null;
       details?: string | null; electricityBillId?: string | null; simIp?: string | null; radarIp?: string | null;
       cameraIp?: string | null; pcIp?: string | null; routerIp?: string | null; laptopIp?: string | null;
       incidentType?: string | null; incidentDetails?: string | null;
@@ -691,7 +600,6 @@ export class RahcomService {
       if (demoOnly && !systemCode.startsWith(this.demoSystemPrefix)) throw new ForbiddenException('Demo accounts can only import demo Rahcom systems.');
       const optionalData = {
         ...(row.details !== undefined ? { details: this.optionalText(row.details, 1000) } : {}),
-        ...(row.axis !== undefined ? { axis: this.optionalText(configuredAxes.has(String(row.axis ?? '').trim()) ? row.axis : canonicalRahcomAxisForProvince(province, row.axis), 120) } : {}),
         ...(row.axisCode !== undefined ? { axisCode: this.optionalText(row.axisCode, 100) } : {}),
         ...(row.announcedAxis !== undefined ? { announcedAxis: this.optionalText(row.announcedAxis, 120) } : {}),
         ...(row.incidentType !== undefined ? { incidentType: row.incidentType } : {}),
@@ -708,19 +616,13 @@ export class RahcomService {
     });
     const codes = new Set<string>();
     for (const row of rows) { if (codes.has(row.systemCode)) throw new BadRequestException(`Duplicate system code: ${row.systemCode}`); codes.add(row.systemCode); }
-    const axisNames = [...new Set(rows.map(({ axis }) => axis).filter((axis): axis is string => Boolean(axis)))];
-    if (axisNames.length) {
-      const existingAxes = await this.prisma.rahcomAxis.count({ where: { organizationId, province } });
-      const initialIsfahanAxes = existingAxes === 0 && province === 'isfahan' ? defaultIsfahanAxes : [];
-      await this.prisma.rahcomAxis.createMany({ data: [...new Set([...initialIsfahanAxes, ...axisNames])].map((name) => ({ organizationId, province, name })), skipDuplicates: true });
-    }
     await this.prisma.$transaction(rows.map((row) => {
-      const { details, axis, axisCode, announcedAxis, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, incidentType, incidentDetails, ...required } = row;
-      const optionalData = { details, axis, axisCode, announcedAxis, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, incidentType, incidentDetails };
+      const { details, axisCode, announcedAxis, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, incidentType, incidentDetails, ...required } = row;
+      const optionalData = { details, axisCode, announcedAxis, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, incidentType, incidentDetails };
       return this.prisma.rahcomSystem.upsert({
         where: { organizationId_province_systemCode: { organizationId, province, systemCode: row.systemCode } },
         update: { ...required, ...Object.fromEntries(Object.entries(optionalData).filter(([, value]) => value !== undefined)) },
-        create: { ...required, details: details ?? null, axis: axis ?? null, axisCode: axisCode ?? null, announcedAxis: announcedAxis ?? null, electricityBillId: electricityBillId ?? null, simIp: simIp ?? null, radarIp: radarIp ?? null, cameraIp: cameraIp ?? null, pcIp: pcIp ?? null, routerIp: routerIp ?? null, laptopIp: laptopIp ?? null, incidentType: incidentType ?? null, incidentDetails: incidentDetails ?? null },
+        create: { ...required, details: details ?? null, axisCode: axisCode ?? null, announcedAxis: announcedAxis ?? null, electricityBillId: electricityBillId ?? null, simIp: simIp ?? null, radarIp: radarIp ?? null, cameraIp: cameraIp ?? null, pcIp: pcIp ?? null, routerIp: routerIp ?? null, laptopIp: laptopIp ?? null, incidentType: incidentType ?? null, incidentDetails: incidentDetails ?? null },
       });
     }));
     return { imported: rows.length };
@@ -738,12 +640,8 @@ export class RahcomService {
     const longitude = body.longitude === undefined ? existing.longitude : Number(body.longitude);
     if (!systemName || !systemCode || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) throw new BadRequestException('Invalid system fields.');
     if (demoOnly && !systemCode.startsWith(this.demoSystemPrefix)) throw new ForbiddenException('Demo accounts cannot move systems outside the demo dataset.');
-    const requestedAxis = body.axis === undefined ? undefined : this.optionalText(body.axis, 120);
-    const configuredAxis = requestedAxis ? await this.prisma.rahcomAxis.findFirst({ where: { organizationId, province: existing.province, name: requestedAxis }, select: { name: true } }) : null;
-    const axis = body.axis === undefined ? undefined : configuredAxis?.name ?? this.optionalText(canonicalRahcomAxisForProvince(existing.province, body.axis), 120);
     const optionalData = {
       ...(body.details !== undefined ? { details: this.optionalText(body.details, 1000) } : {}),
-      ...(body.axis !== undefined ? { axis } : {}),
       ...(body.axisCode !== undefined ? { axisCode: this.optionalText(body.axisCode, 100) } : {}),
       ...(body.announcedAxis !== undefined ? { announcedAxis: this.optionalText(body.announcedAxis, 120) } : {}),
       ...(body.incidentType !== undefined ? { incidentType: body.incidentType } : {}),
@@ -756,7 +654,6 @@ export class RahcomService {
       ...(body.routerIp !== undefined ? { routerIp: this.optionalText(body.routerIp, 100) } : {}),
       ...(body.laptopIp !== undefined ? { laptopIp: this.optionalText(body.laptopIp, 100) } : {}),
     };
-    if (axis) await this.prisma.rahcomAxis.createMany({ data: [{ organizationId, province: existing.province, name: axis }], skipDuplicates: true });
     return this.prisma.rahcomSystem.update({ where: { id }, data: { systemName, systemCode, latitude, longitude, ...optionalData } });
   }
   private optionalText(value: unknown, maxLength: number): string | null {

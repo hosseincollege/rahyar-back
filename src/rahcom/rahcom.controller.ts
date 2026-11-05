@@ -6,7 +6,6 @@ import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
 import {
   CreateRahcomActivityDto,
   SaveRahcomDailyWorkflowDto,
-  CreateRahcomAxisDto,
   CreateRahcomSystemActivityDto,
   CreateRahcomSolarSnapshotDto,
   ReplaceRahcomSolarSpecialSystemsDto,
@@ -16,12 +15,10 @@ import {
   DeleteRahcomSystemsBodyDto,
   DeleteRahcomSystemsQueryDto,
   ImportRahcomSystemsDto,
-  MergeRahcomAxisDto,
   RahcomActivitiesQueryDto,
   RahcomProvinceQueryDto,
   RahcomTrafficSnapshotDatesQueryDto,
   UpdateRahcomSystemDto,
-  UpdateRahcomAxisDto,
   UpdateRahcomMemberProvinceDto,
   UpdateRahcomSelectedProvinceDto,
   UpdateRahcomImportedTicketDescriptionDto,
@@ -33,10 +30,6 @@ import { RahcomService } from './rahcom.service';
 export class RahcomController {
   constructor(private readonly service: RahcomService) {}
 
-  @Get('axes')
-  listAxes(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
-    return this.service.listAxes(user, query.province);
-  }
   @Get('me')
   getRahcomAccess(@CurrentUser() user: AuthenticatedUser) {
     return this.service.getRahcomAccess(user);
@@ -45,23 +38,6 @@ export class RahcomController {
   updateMySelectedProvince(@CurrentUser() user: AuthenticatedUser, @Body() body: UpdateRahcomSelectedProvinceDto) {
     return this.service.updateSelectedProvince(user, body.province);
   }
-  @Post('axes')
-  createAxis(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomAxisDto) {
-    return this.service.createAxis(user, body);
-  }
-  @Put('axes/:id')
-  updateAxis(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: UpdateRahcomAxisDto) {
-    return this.service.updateAxis(user, id, body.name);
-  }
-  @Post('axes/:id/merge')
-  mergeAxis(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: MergeRahcomAxisDto) {
-    return this.service.mergeAxis(user, id, body.targetAxisId);
-  }
-  @Delete('axes/:id')
-  deleteAxis(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.service.deleteAxis(user, id);
-  }
-
   @Get('systems')
   listSystems(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
     return this.service.listSystems(user, query.province);

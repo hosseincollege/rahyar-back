@@ -21,7 +21,6 @@ import {
 export class RahcomSystemImportRowDto {
   @IsString() @MinLength(1) @MaxLength(200) systemName!: string;
   @IsString() @MinLength(1) @MaxLength(100) systemCode!: string;
-  @IsOptional() @IsString() @MaxLength(120) axis?: string | null;
   @IsOptional() @IsString() @MaxLength(100) axisCode?: string | null;
   @IsOptional() @IsString() @MaxLength(120) announcedAxis?: string | null;
   @IsOptional() @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE', 'WIDENING_RELOCATION']) incidentType?: string | null;
@@ -47,7 +46,6 @@ export class ImportRahcomSystemsDto {
 export class UpdateRahcomSystemDto {
   @IsOptional() @IsString() @MinLength(1) @MaxLength(200) systemName?: string;
   @IsOptional() @IsString() @MinLength(1) @MaxLength(100) systemCode?: string;
-  @IsOptional() @IsString() @MaxLength(120) axis?: string | null;
   @IsOptional() @IsString() @MaxLength(100) axisCode?: string | null;
   @IsOptional() @IsString() @MaxLength(120) announcedAxis?: string | null;
   @IsOptional() @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE', 'WIDENING_RELOCATION']) incidentType?: string | null;
@@ -80,19 +78,6 @@ export class RahcomTrafficSnapshotDatesQueryDto {
   @IsOptional() @IsString() @MaxLength(80) province?: string;
   @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) from!: string;
   @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) to!: string;
-}
-
-export class CreateRahcomAxisDto {
-  @IsString() @MinLength(1) @MaxLength(80) province!: string;
-  @IsString() @MinLength(1) @MaxLength(120) name!: string;
-}
-
-export class UpdateRahcomAxisDto {
-  @IsString() @MinLength(1) @MaxLength(120) name!: string;
-}
-
-export class MergeRahcomAxisDto {
-  @IsString() @MinLength(1) targetAxisId!: string;
 }
 
 export class CreateRahcomSolarSnapshotDto {

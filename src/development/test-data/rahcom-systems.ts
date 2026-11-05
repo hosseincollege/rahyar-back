@@ -4,7 +4,6 @@ import type { Prisma } from '@prisma/client';
 export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'organizationId'>> = [
   {
     "province": "isfahan",
-    "axis": "خور-طبس",
     "systemName": "بعد از خور",
     "systemCode": "062D13032",
     "latitude": 33.771642,
@@ -20,7 +19,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "نایین-انارک-خور",
     "systemName": "قبل از فرخی",
     "systemCode": "062D13031",
     "latitude": 33.8345833,
@@ -36,7 +34,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "نایین-انارک-خور",
     "systemName": "قبل از چاه ملک",
     "systemCode": "062D13030",
     "latitude": 33.758458,
@@ -52,7 +49,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "نایین-انارک-خور",
     "systemName": "ده کیلومتر قبل از سه راهی جندق",
     "systemCode": "062D13029",
     "latitude": 33.6432222,
@@ -68,7 +64,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "نایین-انارک-خور",
     "systemName": "پنج کیلومتر بعد ازانارک-81",
     "systemCode": "062S13025",
     "latitude": 33.3009444,
@@ -84,7 +79,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-قم-دلیجان",
     "systemName": "95 - 1کیلومتر بعد از پمپ بنزین",
     "systemCode": "065E13011",
     "latitude": 33.4853333,
@@ -100,7 +94,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-قم-دلیجان",
     "systemName": "68 - 1.3کیلومتر قبل از پمپ بنزین",
     "systemCode": "065W13012",
     "latitude": 33.5045277,
@@ -116,7 +109,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-قم-دلیجان",
     "systemName": "روبروی شرکت گلبهار - 88/3",
     "systemCode": "065W13010",
     "latitude": 33.360405,
@@ -132,7 +124,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "بعد از مجتمع آقتاب به سمت قم.-57/8",
     "systemCode": "007E13015",
     "latitude": 33.360405,
@@ -148,7 +139,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "روستای شجاع آباد به سمت اصفهان-98/8",
     "systemCode": "007W13014",
     "latitude": 33.4220833,
@@ -164,7 +154,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "پنج کیلومتر بعد از مجتمع رفاهی آفتاب به سمت قم.-53",
     "systemCode": "007E13016",
     "latitude": 33.3177777,
@@ -180,7 +169,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "پنج کیلومتر بعد از رفاهی آفتاب به سمت اصفهان- 112",
     "systemCode": "007W13016",
     "latitude": 33.3176194,
@@ -196,7 +184,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "شهرضا-آباده",
     "systemName": "بعد از روستای امین آباد53/8",
     "systemCode": "065W13016",
     "latitude": 31.6638055,
@@ -212,7 +199,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "شهرضا-آباده",
     "systemName": "بعد از روستای امین آباد-69",
     "systemCode": "065E13016",
     "latitude": 31.6642777,
@@ -228,7 +214,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "بعد از پل سرشک به سمت اصفهان-77/2",
     "systemCode": "007W13013",
     "latitude": 33.28583,
@@ -244,7 +229,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم-کاشان-نائین",
     "systemName": "قبل از تقاطع آب شیرین",
     "systemCode": "071D13001",
     "latitude": 34.3048333,
@@ -260,7 +244,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "55 کیلومتر بعد از قم به سمت اصفهان-57/4",
     "systemCode": "007W13002",
     "latitude": 34.30725278,
@@ -276,7 +259,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "55 کیلومتر بعد از قم به سمت قم-41/4",
     "systemCode": "007E13002",
     "latitude": 34.30725278,
@@ -292,7 +274,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "بعد از پل جزن به سمت قم.-87/5",
     "systemCode": "007E13012",
     "latitude": 33.552658,
@@ -308,7 +289,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "شهرضا-آباده",
     "systemName": "بعد از روستای باغ سرخ-82/6",
     "systemCode": "065E13015",
     "latitude": 31.7773888,
@@ -324,7 +304,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "شهرضا-آباده",
     "systemName": "بعد از روستای باغ سرخ-40/2",
     "systemCode": "065W13015",
     "latitude": 31.7777222,
@@ -340,7 +319,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم-کاشان-نائین",
     "systemName": "قبل از سه راهی مهاباد-184",
     "systemCode": "071W13013",
     "latitude": 33.5393055,
@@ -356,7 +334,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم-اصفهان1",
     "systemName": "بعد از جاده گرمسار به سمت اصفهان-45/9",
     "systemCode": "007W13001",
     "latitude": 34.389102,
@@ -372,7 +349,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-قم1",
     "systemName": "بعد از جاده گرمسار به سمت قم.-52/9",
     "systemCode": "007E13001",
     "latitude": 34.389303,
@@ -388,7 +364,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم-کاشان-نائین",
     "systemName": "قبل از مجتمع رفاهی ارگ نیلوفر-233",
     "systemCode": "071W13017",
     "latitude": 33.196124,
@@ -404,7 +379,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "شهرضا-سمیرم-میمند",
     "systemName": "روبروی روستای کهرویه-28.6",
     "systemCode": "063W13004",
     "latitude": 31.72424,
@@ -420,7 +394,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم-کاشان-نائین",
     "systemName": "قبل از سه راهی مهاباد-115.1",
     "systemCode": "071E13014",
     "latitude": 33.5162777,
@@ -436,7 +409,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-نایین",
     "systemName": "57- 500متر قبل از خروجی جزه در مسیر برگشت",
     "systemCode": "062N13006",
     "latitude": 32.722888,
@@ -452,7 +424,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "آزادراه شهید کاظمی",
     "systemName": "1کیلومترقبل عوارضی-18/5",
     "systemCode": "007W13027",
     "latitude": 32.88302778,
@@ -468,7 +439,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "آزادراه شهید کاظمی",
     "systemName": "1کیلومترقبل عوارضی-61/6",
     "systemCode": "007E13027",
     "latitude": 32.88277778,
@@ -484,7 +454,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم-کاشان-نائین",
     "systemName": "دو کیلومتر بعد از مجتمع پارسا-روستای نیستانک-26.6",
     "systemCode": "071E13030",
     "latitude": 32.9607222,
@@ -500,7 +469,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "شهرضا-سمیرم-میمند",
     "systemName": "قبل از روستای کهرویه-100.4",
     "systemCode": "063E13005",
     "latitude": 31.70393,
@@ -516,7 +484,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم-کاشان-نائین",
     "systemName": "بعد از خروجی بادرود-144.5",
     "systemCode": "071E13009",
     "latitude": 33.6659722,
@@ -532,7 +499,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-نایین",
     "systemName": "71/7- 4کیلومتر قبل از کوهپایه",
     "systemCode": "062N13004",
     "latitude": 32.7163055,
@@ -548,7 +514,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-نایین",
     "systemName": "57/8 - 4کیلومتر قبل از کوهپایه",
     "systemCode": "062S13004",
     "latitude": 32.71586111,
@@ -564,7 +529,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "یزد-نوگنبد",
     "systemName": "4کیلومتر قبل از نوگنبد-129",
     "systemCode": "071E13024",
     "latitude": 32.7041389,
@@ -580,7 +544,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "یزد-نوگنبد",
     "systemName": "4کیلومتر قبل از نوگنبد-28",
     "systemCode": "071W13023",
     "latitude": 32.7039167,
@@ -596,7 +559,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-نایین",
     "systemName": "74/4- 3کیلومتر بعد از کارخانه قائم بافت",
     "systemCode": "062S13005",
     "latitude": 32.719833,
@@ -612,7 +574,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "شهرضا-سمیرم-میمند",
     "systemName": "بعد از سمیرم-دانشگاه آزاد-49.9",
     "systemCode": "063E13008",
     "latitude": 31.3860555,
@@ -628,7 +589,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "شهرضا-سمیرم-میمند",
     "systemName": "بعد از سمیرم-دانشگاه آزاد-82.4",
     "systemCode": "063W13008",
     "latitude": 31.3863888,
@@ -644,7 +604,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "تیران-سامان-شهرکرد",
     "systemName": "روبروی شهرک صنعتی رضوانشهر",
     "systemCode": "917S13001",
     "latitude": 32.6650833,
@@ -660,7 +619,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "خروجی خالد آباد به سمت قم.-103",
     "systemCode": "007W13011",
     "latitude": 33.64883611,
@@ -676,7 +634,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "خروجی خالد آباد به سمت اصفهان-61/8",
     "systemCode": "007E13011",
     "latitude": 33.64981944,
@@ -692,7 +649,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم-کاشان-نائین",
     "systemName": "قبل از مجتمع خدماتی آقاجانی-153.9",
     "systemCode": "071W13033",
     "latitude": 33.6848333,
@@ -708,7 +664,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "سربالایی مشکات به سمت قم.-19/4",
     "systemCode": "007E13003",
     "latitude": 34.12060556,
@@ -724,7 +679,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "آزادراه شهید کاظمی",
     "systemName": "56کیلومتر به اصفهان-52/6",
     "systemCode": "007E13026",
     "latitude": 32.81625,
@@ -740,7 +694,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "آزادراه شهید کاظمی",
     "systemName": "56کیلومتر به اصفهان-27/5",
     "systemCode": "007W13026",
     "latitude": 32.81625,
@@ -756,7 +709,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "زیر گذر خرمدشت به سمت قم.-140",
     "systemCode": "007E13008",
     "latitude": 33.83786111,
@@ -772,7 +724,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-نایین",
     "systemName": "روبروی کارگاه کمپرس سازی خیبر-12",
     "systemCode": "062S13001",
     "latitude": 32.66947222,
@@ -788,7 +739,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-نایین",
     "systemName": "روبروی کارگاه کمپرس سازی خیبر-117/5",
     "systemCode": "062N13001",
     "latitude": 32.66977778,
@@ -804,7 +754,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "نجف آباد-الیگودرز",
     "systemName": "سرازیری نوقان-139/8",
     "systemCode": "062N13014",
     "latitude": 33.163489,
@@ -820,7 +769,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "شهرضا-سمیرم-میمند",
     "systemName": "بعد از روستای چهارراه",
     "systemCode": "063D13010",
     "latitude": 31.1883611,
@@ -836,7 +784,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "شیر کده",
     "systemCode": "007W13040",
     "latitude": 34.0799,
@@ -852,7 +799,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم-کاشان-نائین",
     "systemName": "روبروی کارخانه شهاب سنگ",
     "systemCode": "071D13004",
     "latitude": 34.078723,
@@ -868,7 +814,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-قم-دلیجان",
     "systemName": "روبروی کارتن پلاست",
     "systemCode": "065W13007",
     "latitude": 33.053318,
@@ -884,7 +829,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "17 کیلومتر مانده به کاشان",
     "systemCode": "007W13007",
     "latitude": 33.86552778,
@@ -900,7 +844,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "بعد از خدمات رفاهی ولیعصر به سمت قم.-11/2",
     "systemCode": "009E13002",
     "latitude": 32.82655556,
@@ -916,7 +859,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-فرودگاه",
     "systemName": "وروردی قهجاورستان - 1/6",
     "systemCode": "903N13002",
     "latitude": 32.7185,
@@ -932,7 +874,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-فرودگاه",
     "systemName": "وروردی قهجاورستان - 12/9",
     "systemCode": "903S13002",
     "latitude": 32.71827778,
@@ -948,7 +889,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "دامنه-خوانسار-خمین",
     "systemName": "دو کیلومتر قبل از سه راهی دامنه",
     "systemCode": "047S13080",
     "latitude": 33.05050278,
@@ -964,7 +904,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "آزادراه شهید کاظمی",
     "systemName": "روبروی مسکن مهر فولاد شهر-6/5",
     "systemCode": "007E13021",
     "latitude": 32.51002778,
@@ -980,7 +919,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "آزادراه شهید کاظمی",
     "systemName": "روبروی مسکن مهر فولاد شهر",
     "systemCode": "007W13021",
     "latitude": 32.5095,
@@ -996,7 +934,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "آزادراه شهید کاظمی",
     "systemName": "قبل از شرکت سپاهان قطره-پل آزادراه-1/1",
     "systemCode": "007W13029",
     "latitude": 32.99903,
@@ -1012,7 +949,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "آزادراه شهید کاظمی",
     "systemName": "قبل از شرکت سپاهان قطره-پل آزادراه-79/1",
     "systemCode": "007E13029",
     "latitude": 32.997935,
@@ -1028,7 +964,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "نجف آباد-الیگودرز",
     "systemName": "روبرئی پایگاه اورژانس-55/9",
     "systemCode": "062S13013",
     "latitude": 33.164278,
@@ -1044,7 +979,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "بعد از مجتمع خدماتی سان آرا به سمت قم.-123",
     "systemCode": "007E13010",
     "latitude": 33.74813889,
@@ -1060,7 +994,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "یک کیلومتری شاهین شهر",
     "systemCode": "009W13001",
     "latitude": 32.87720278,
@@ -1076,7 +1009,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-قم-دلیجان",
     "systemName": "روبروی باغ بلوریان",
     "systemCode": "065E13005",
     "latitude": 32.9134,
@@ -1092,7 +1024,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "مقابل پمپ بنزین چهلستون",
     "systemCode": "065W13000",
     "latitude": 32.98208333,
@@ -1108,7 +1039,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "اولین استراحتگاه اصفهان کاشان به سمت اصفهان-158",
     "systemCode": "007W13017",
     "latitude": 33.05360833,
@@ -1124,7 +1054,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "اولین استراحتگاه اصفهان کاشان به سمت قم.-7/3",
     "systemCode": "007E13017",
     "latitude": 33.05359722,
@@ -1140,7 +1069,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "فولادشهر-شهرکرد",
     "systemName": "نرسیده به روستای لایبید",
     "systemCode": "051N13003",
     "latitude": 32.354878,
@@ -1156,7 +1084,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-قم-دلیجان",
     "systemName": "روبروی شهرک شهید منتظری - 163",
     "systemCode": "065W13002",
     "latitude": 32.761746,
@@ -1172,7 +1099,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "قبل از عوارضی کاشان به سمت اصفهان-94",
     "systemCode": "007W13005",
     "latitude": 33.97866667,
@@ -1188,7 +1114,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم-کاشان-نائین",
     "systemName": "قبل از کارخانه تابریسان کاشان",
     "systemCode": "071N13005",
     "latitude": 33.9234166,
@@ -1204,7 +1129,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "شهرضا-سمیرم-میمند",
     "systemName": "قبل از قصرچم-6.3",
     "systemCode": "063W13001",
     "latitude": 31.919258,
@@ -1220,7 +1144,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "شهرضا-سمیرم-میمند",
     "systemName": "قبل از قصرچم-126.6",
     "systemCode": "063E13001",
     "latitude": 31.920007,
@@ -1236,7 +1159,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "دلیجان اصفهان",
     "systemName": "قبل از وروردی شهرک شهید منتظری - 2/6",
     "systemCode": "065E13001",
     "latitude": 32.76167,
@@ -1252,7 +1174,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "نجف آباد-الیگودرز",
     "systemName": "یک کیلومتر قبل از روستای نهر خلج",
     "systemCode": "062S13015",
     "latitude": 32.990139,
@@ -1268,7 +1189,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-قم1",
     "systemName": "پارک شهر کاشان به سمت قم.-1/6",
     "systemCode": "007E13006",
     "latitude": 33.970332,
@@ -1284,7 +1204,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "فولادشهر-شهرکرد",
     "systemName": "بعد از خروجی لایبید - 15/6",
     "systemCode": "051S13004",
     "latitude": 32.3528055,
@@ -1300,7 +1219,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "شهرضا-سمیرم-میمند",
     "systemName": "1 کیلومترقبل مجتمع خدماتی پیر مرادیان-77.2",
     "systemCode": "063E13007",
     "latitude": 31.562498,
@@ -1316,7 +1234,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "شهرضا-سمیرم-میمند",
     "systemName": "ا کیلومتر بعد از مجتمع خدماتی پیر مرادیان-54.5",
     "systemCode": "063W13006",
     "latitude": 31.5680833,
@@ -1332,7 +1249,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "آزادراه شهید کاظمی",
     "systemName": "قبل از شن شویی-33.2",
     "systemCode": "007E13024",
     "latitude": 32.41561,
@@ -1348,7 +1264,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "آزادراه شهید کاظمی",
     "systemName": "بعد از شن شویی-46/9",
     "systemCode": "007W13024",
     "latitude": 32.70005556,
@@ -1364,7 +1279,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "شهرضا-آباده",
     "systemName": "بعد از شهرک صنعتی منظریه-104",
     "systemCode": "065E13014",
     "latitude": 31.9335,
@@ -1380,7 +1294,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "شهرضا-آباده",
     "systemName": "بعد از شهرک صنعتی منظریه-19/3",
     "systemCode": "065W13014",
     "latitude": 31.93344444,
@@ -1396,7 +1309,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "آزادراه شهید کاظمی",
     "systemName": "5کیلومترقبل از عوارض فولاد شهر-58/2",
     "systemCode": "007W13023",
     "latitude": 32.62041667,
@@ -1412,7 +1324,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "آزادراه شهید کاظمی",
     "systemName": "5کیلومترقبل از عوارض فولاد شهر-21/9",
     "systemCode": "007E13023",
     "latitude": 32.62061111,
@@ -1428,7 +1339,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "فولادشهر-شهرکرد",
     "systemName": "یک کیلومتر بعد از جاده اختصاصی ذوب آهن",
     "systemCode": "051N13010",
     "latitude": 32.44076667,
@@ -1444,7 +1354,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "فولادشهر-شهرکرد",
     "systemName": "روبروی پارکینگ فولاد شهر - 49/7",
     "systemCode": "051S13001",
     "latitude": 32.46616667,
@@ -1460,7 +1369,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-فرودگاه",
     "systemName": "1.9 کیلومتر قبل از تقاطع شهید اردستانی-4",
     "systemCode": "903S13004",
     "latitude": 32.71478,
@@ -1476,7 +1384,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-فرودگاه",
     "systemName": "1.9 کیلومتر قبل از تقاطع شهید اردستانی-7.3",
     "systemCode": "903N13004",
     "latitude": 32.7147,
@@ -1492,7 +1399,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "نایین-انارک-خور",
     "systemName": "پنج کیلومتر بعد از بافران-229.9",
     "systemCode": "062N13020",
     "latitude": 32.8928055,
@@ -1508,7 +1414,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "نایین-انارک-خور",
     "systemName": "پنج کیلومتر بعد از بافران-6.6",
     "systemCode": "062S13020",
     "latitude": 32.89221,
@@ -1524,7 +1429,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "یزد-نوگنبد",
     "systemName": "دو کیلومتر بعد از گلوگاه (پلیس انتظامی)",
     "systemCode": "071E13010",
     "latitude": 32.8160833,
@@ -1540,7 +1444,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "بعد از پمپ بنزین کیمیا به سمت قم.-1/9",
     "systemCode": "009E13003",
     "latitude": 32.753365,
@@ -1556,7 +1459,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم - اصفهان",
     "systemName": "بعد از پمپ بنزین کیمیا به سمت اصفهان-33/2",
     "systemCode": "009W13003",
     "latitude": 32.75280278,
@@ -1572,7 +1474,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "یزد-نوگنبد",
     "systemName": "دو کیلومتر قبل از پلیس راه جدید در مسیر برگشت-10.",
     "systemCode": "071W13022",
     "latitude": 32.8150556,
@@ -1588,7 +1489,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-نایین",
     "systemName": "روبروی هومن بار نائین (5کیلومتر قبل از نائین) - 12",
     "systemCode": "062S13009",
     "latitude": 32.82538889,
@@ -1604,7 +1504,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-نایین",
     "systemName": "روبروی هومن بار نائین (5کیلومتر قبل از نائین) - 4/",
     "systemCode": "062N13009",
     "latitude": 32.825833,
@@ -1620,7 +1519,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-نایین",
     "systemName": "29/5 - 700متر قبل از ایستگاه تقلیل پمپ گاز",
     "systemCode": "062S13002",
     "latitude": 32.69086111,
@@ -1636,7 +1534,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-نایین",
     "systemName": "105/5- 1کیلومتر بعد از رحیم آباد",
     "systemCode": "062S13008",
     "latitude": 32.7236,
@@ -1652,7 +1549,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-نایین",
     "systemName": "99/5 - 200متر قبل از ایستگاه تقلیل پمپ گاز",
     "systemCode": "062N13003",
     "latitude": 32.69202778,
@@ -1668,7 +1564,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان-نایین",
     "systemName": "بعد از پدافند هوایی شهید عسگری - 34/8",
     "systemCode": "062N13007",
     "latitude": 32.73644444,
@@ -1684,7 +1579,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "دامنه-خوانسار-خمین",
     "systemName": "دو کیلومتر قبل از گلپایگان-49.3",
     "systemCode": "047N13003",
     "latitude": 33.388089,
@@ -1700,7 +1594,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "دامنه-خوانسار-خمین",
     "systemName": "دو کیلومتر قبل از گلپایگان-46.5",
     "systemCode": "047S13003",
     "latitude": 33.387954,
@@ -1716,7 +1609,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "دامنه-خوانسار-خمین",
     "systemName": "پنج کیلومتر قبل از خوانسار-23.2",
     "systemCode": "047N13005",
     "latitude": 33.1972777,
@@ -1732,7 +1624,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "دامنه-خوانسار-خمین",
     "systemName": "پنج کیلومتر قبل از خوانسار-72.6",
     "systemCode": "047S13005",
     "latitude": 33.1971111,
@@ -1748,7 +1639,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "فولادشهر-شهرکرد",
     "systemName": "قبل از وروردی چمگردان - 36/8",
     "systemCode": "051S13002",
     "latitude": 32.400035,
@@ -1764,7 +1654,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "قم-کاشان-نائین",
     "systemName": "تقاطع آران وبیدگل",
     "systemCode": "071E13035",
     "latitude": 33.8155277,
@@ -1780,7 +1669,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "فولادشهر-شهرکرد",
     "systemName": "روبروی وروردی چمگردان - 17/6",
     "systemCode": "051N13002",
     "latitude": 32.400061,
@@ -1796,7 +1684,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "نجف آباد-الیگودرز",
     "systemName": "روبروی دارو سازی -41/9",
     "systemCode": "062N13010",
     "latitude": 33.81552778,
@@ -1812,7 +1699,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "نجف آباد-الیگودرز",
     "systemName": "رستوران فریدون بزرگ-102/7",
     "systemCode": "062N13011",
     "latitude": 32.98802778,
@@ -1828,7 +1714,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "شهرضا-آباده",
     "systemName": "کمربندی شهرضا-چغاد-2/8",
     "systemCode": "065W13013",
     "latitude": 32.03494444,
@@ -1844,7 +1729,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "شهرضا-آباده",
     "systemName": "کمربندی شهرضا-چغاد-120/5",
     "systemCode": "065E13013",
     "latitude": 32.03475,
@@ -1860,7 +1744,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "دامنه-خوانسار-خمین",
     "systemName": "شهرک صنعتی سعید آباد-72.5",
     "systemCode": "047N13002",
     "latitude": 33.5430833,
@@ -1876,7 +1759,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "دامنه-خوانسار-خمین",
     "systemName": "شهرک صنعتی سعید آباد-23.3",
     "systemCode": "047S13002",
     "latitude": 33.5429166,
@@ -1892,7 +1774,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "یزد-نوگنبد",
     "systemName": "روبروی ایران خودرو دیزل-152",
     "systemCode": "071E13020",
     "latitude": 32.8424167,
@@ -1908,7 +1789,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "یزد-نوگنبد",
     "systemName": "روبروی کوره های آجرپزی",
     "systemCode": "071W13021",
     "latitude": 32.84005,
@@ -1924,7 +1804,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان - صفاشهر",
     "systemName": "پاسگاه پليس راه اصفهان شيراز",
     "systemCode": "065P13085",
     "latitude": 32.416813,
@@ -1940,7 +1819,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اصفهان - صفاشهر",
     "systemName": "پليس راه خرمبيد",
     "systemCode": "065P63087",
     "latitude": 30.674758,
@@ -1956,7 +1834,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "دلیجان - اصفهان",
     "systemName": "اورژانس مورچه خورت",
     "systemCode": "065W13901",
     "latitude": 33.10401,
@@ -1972,7 +1849,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "اردستان - نائین",
     "systemName": "071W13906",
     "systemCode": "071W13906",
     "latitude": 32.8793,
@@ -1988,7 +1864,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "نائین-اردستان",
     "systemName": "071E13906",
     "systemCode": "071E13906",
     "latitude": 32.88033,
@@ -2004,7 +1879,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "نایین-انارک-خور",
     "systemName": "چهار کیلومتر قبل از انارک",
     "systemCode": "062N13024",
     "latitude": 33.2819444,
@@ -2020,7 +1894,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "حبیب آباد-اردستان",
     "systemName": "روبروی شهرک صنعتی کمشچه",
     "systemCode": "656E13201",
     "latitude": 32.929017,
@@ -2036,7 +1909,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "حبیب آباد-اردستان",
     "systemName": "کارخانه سیمان اردستان",
     "systemCode": "656E13202",
     "latitude": 33.105823,
@@ -2052,7 +1924,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "حبیب آباد-اردستان",
     "systemName": "روستای بغم - اردستان",
     "systemCode": "656E13203",
     "latitude": 33.161633,
@@ -2068,7 +1939,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "حبیب آباد-اردستان",
     "systemName": "روستای آونج",
     "systemCode": "656E13204",
     "latitude": 33.262317,
@@ -2084,7 +1954,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "میمه-موته-گلپایگان",
     "systemName": "سه راهی میمه به سمت موته",
     "systemCode": "586N13201",
     "latitude": 32.510257,
@@ -2100,7 +1969,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "موته- گلپایگان",
     "systemName": "ورودی موته به سمت گلپایگان",
     "systemCode": "586N13202",
     "latitude": 33.641977,
@@ -2116,7 +1984,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "موته- گلپایگان",
     "systemName": "سه راه لایبید به سمت گلپایگان",
     "systemCode": "586N13203",
     "latitude": 33.571802,
@@ -2132,7 +1999,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "موته- گلپایگان",
     "systemName": "پاسگاه گلپایگان به سمت گلپایگان",
     "systemCode": "586N13204",
     "latitude": 33.549707,
@@ -2148,7 +2014,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "نجف آباد فولادشهر",
     "systemName": "دو راهی جوزدان",
     "systemCode": "961W13201",
     "latitude": 32.59236,
@@ -2164,7 +2029,6 @@ export const rahcomSystems: Array<Omit<Prisma.RahcomSystemCreateManyInput, 'orga
   },
   {
     "province": "isfahan",
-    "axis": "نجف آباد فولادشهر",
     "systemName": "فیلور",
     "systemCode": "961W13202",
     "latitude": 32.51046,

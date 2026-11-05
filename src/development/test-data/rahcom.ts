@@ -1,18 +1,7 @@
 import type { TestDataContext, TestDataSeedResult } from './context';
 import { fixtureDate, fixtureUserId } from './context';
 import { rahcomSystems } from './rahcom-systems';
-import { canonicalRahcomAxisForProvince, defaultIsfahanAxes } from '../../rahcom/rahcom-axis';
-
-function canonicalTestAxis(axis: string | null | undefined, latitude: number, longitude: number) {
-  void latitude;
-  void longitude;
-  return canonicalRahcomAxisForProvince('isfahan', axis) || null;
-}
-
-const systems = rahcomSystems.map((system) => ({
-  ...system,
-  axis: canonicalTestAxis(system.axis, system.latitude, system.longitude),
-}));
+const systems = rahcomSystems;
 export const DEMO_RAHCOM_SYSTEM_CODE_PREFIX = 'DEMO-RAHCOM-';
 export const DEMO_RAHCOM_ACTIVITY_PREFIX = '';
 export const DEMO_RAHCOM_SYSTEM_CODES = systems.map(({ systemCode }) => systemCode);
@@ -57,10 +46,6 @@ export async function seedRahcom(ctx: TestDataContext): Promise<TestDataSeedResu
     if (linkedActivities === 0) await ctx.db.rahcomSystem.delete({ where: { id: legacy.id } });
   }
 
-  await ctx.db.rahcomAxis.createMany({
-    data: defaultIsfahanAxes.map((name) => ({ organizationId: ctx.organizationId, province: 'isfahan', name })),
-    skipDuplicates: true,
-  });
 
   for (let index = 0; index < activities.length; index += 1) {
     const item = activities[index];

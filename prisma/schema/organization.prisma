@@ -45,7 +45,6 @@ model Organization {
   announcements      Announcement[]
   testDataRuns        DevelopmentTestDataRun[]
   rahcomSystems       RahcomSystem[]
-  rahcomAxes          RahcomAxis[]
   rahcomTrafficSnapshots RahcomTrafficSnapshot[]
   rahcomActivities    RahcomActivity[]
   rahcomSolarSnapshots RahcomSolarSnapshot[]
