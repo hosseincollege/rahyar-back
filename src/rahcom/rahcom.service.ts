@@ -193,7 +193,7 @@ export class RahcomService {
       province,
       listDate,
       summary: row.summary?.trim() ?? '',
-      description: descriptionsByTicket.get(row.ticketCode.trim()) ?? '',
+      description: row.description?.trim() ?? descriptionsByTicket.get(row.ticketCode.trim()) ?? '',
       customer: row.customer?.trim() ?? '',
       equipment: row.equipment?.trim() ?? '',
       type: row.type?.trim() ?? '',

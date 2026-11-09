@@ -112,6 +112,7 @@ export class RahcomImportedTicketRowDto {
   @IsOptional() @IsString() @MaxLength(100) systemCode?: string;
   @IsOptional() @IsString() @MaxLength(80) province?: string | null;
   @IsOptional() @IsString() @MaxLength(10000) summary?: string;
+  @IsOptional() @IsString() @MaxLength(10000) description?: string;
   @IsOptional() @IsString() @MaxLength(10000) customer?: string;
   @IsOptional() @IsString() @MaxLength(10000) equipment?: string;
   @IsOptional() @IsString() @MaxLength(120) type?: string;
