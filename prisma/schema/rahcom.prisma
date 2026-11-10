@@ -6,6 +6,9 @@ model RahcomSystem {
   systemCode        String           @db.VarChar(100)
   axisCode          String?          @db.VarChar(100)
   announcedAxis     String?          @map("announced_axis") @db.VarChar(120)
+  longOutage        Boolean          @default(false) @map("long_outage")
+  longOutageReason  String?          @map("long_outage_reason") @db.VarChar(40)
+  longOutageDetails String?          @map("long_outage_details") @db.VarChar(1000)
   incidentType      String?          @db.VarChar(24)
   incidentDetails   String?          @db.VarChar(1000)
   latitude          Float

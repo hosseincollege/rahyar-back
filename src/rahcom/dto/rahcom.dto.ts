@@ -23,6 +23,9 @@ export class RahcomSystemImportRowDto {
   @IsString() @MinLength(1) @MaxLength(100) systemCode!: string;
   @IsOptional() @IsString() @MaxLength(100) axisCode?: string | null;
   @IsOptional() @IsString() @MaxLength(120) announcedAxis?: string | null;
+  @IsOptional() @IsBoolean() longOutage?: boolean;
+  @IsOptional() @IsIn(['THEFT_DAMAGE', 'RELOCATION', 'ELECTRICITY_DEBT', 'PAYMENT_ARREARS', 'POWER_OUTAGE', 'OTHER']) longOutageReason?: string | null;
+  @IsOptional() @IsString() @MaxLength(1000) longOutageDetails?: string | null;
   @IsOptional() @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE', 'WIDENING_RELOCATION']) incidentType?: string | null;
   @IsOptional() @IsString() @MaxLength(1000) incidentDetails?: string | null;
   @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-90) @Max(90) latitude!: number;
@@ -48,6 +51,9 @@ export class UpdateRahcomSystemDto {
   @IsOptional() @IsString() @MinLength(1) @MaxLength(100) systemCode?: string;
   @IsOptional() @IsString() @MaxLength(100) axisCode?: string | null;
   @IsOptional() @IsString() @MaxLength(120) announcedAxis?: string | null;
+  @IsOptional() @IsBoolean() longOutage?: boolean;
+  @IsOptional() @IsIn(['THEFT_DAMAGE', 'RELOCATION', 'ELECTRICITY_DEBT', 'PAYMENT_ARREARS', 'POWER_OUTAGE', 'OTHER']) longOutageReason?: string | null;
+  @IsOptional() @IsString() @MaxLength(1000) longOutageDetails?: string | null;
   @IsOptional() @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE', 'WIDENING_RELOCATION']) incidentType?: string | null;
   @IsOptional() @IsString() @MaxLength(1000) incidentDetails?: string | null;
   @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-90) @Max(90) latitude?: number;
@@ -169,6 +175,7 @@ export class SaveRahcomDailyWorkflowDto {
   @IsOptional() @IsString() @MaxLength(10000) visitPlan?: string | null;
   @IsOptional() @IsString() @MaxLength(10000) completionReport?: string | null;
   @IsOptional() @IsString() @MaxLength(10000) dailyNote?: string | null;
+  @IsOptional() @IsString() @MaxLength(10000) actionsData?: string | null;
   @IsBoolean() excelUpdated!: boolean;
   @IsOptional() @IsString() @MaxLength(255) excelFileName?: string | null;
 }

@@ -503,7 +503,10 @@ export class RahcomService {
     }
     const serialized = JSON.stringify({ headers, rows });
     if (Buffer.byteLength(serialized, 'utf8') > 8 * 1024 * 1024) throw new BadRequestException('The parsed traffic list is too large to save.');
-    if (!headers.some((value) => value.includes('کد سامانه')) || !headers.some((value) => value.includes('استان'))) {
+    const normalizedHeader = (value: string) => value.trim().normalize('NFKC').toLocaleLowerCase('fa')
+      .replace(/[\u064a\u0649]/g, '\u06cc').replace(/\u0643/g, '\u06a9').replace(/[\u200c\s_./()\-]/g, '');
+    if (!headers.some((value) => { const key = normalizedHeader(value); return key.includes('کدسامانه') || key.includes('systemcode') || key === 'code' || key === 'sitecode'; })
+      || !headers.some((value) => { const key = normalizedHeader(value); return key.includes('استان') || key.includes('province'); })) {
       throw new BadRequestException('The selected worksheet must include system code and province columns.');
     }
     return this.prisma.rahcomTrafficSnapshot.create({
@@ -519,14 +522,16 @@ export class RahcomService {
     });
     if (!snapshot) throw new NotFoundException('No traffic list has been registered yet.');
 
-    const normalizeHeader = (value: string) => value.trim().toLocaleLowerCase('fa').replace(/[\u200c\s]/g, '');
+    const normalizeHeader = (value: string) => value.trim().normalize('NFKC').toLocaleLowerCase('fa')
+      .replace(/[\u064a\u0649]/g, '\u06cc').replace(/\u0643/g, '\u06a9')
+      .replace(/[\u200c\s_./()\-]/g, '');
     const headers = Array.isArray(snapshot.headers) ? snapshot.headers.map((value) => String(value ?? '')) : [];
     const rows = Array.isArray(snapshot.rows) ? snapshot.rows as unknown[][] : [];
     const normalizedHeaders = headers.map(normalizeHeader);
-    const codeIndex = normalizedHeaders.findIndex((value) => value.includes('کدسامانه'));
-    const provinceIndex = normalizedHeaders.findIndex((value) => value.includes('استان'));
-    const axisCodeIndex = normalizedHeaders.findIndex((value) => value.includes('کدمحور'));
-    const axisNameIndex = normalizedHeaders.findIndex((value) => value.includes('ناممحور'));
+    const codeIndex = normalizedHeaders.findIndex((value) => value.includes('کدسامانه') || value.includes('systemcode') || value === 'code' || value === 'sitecode');
+    const provinceIndex = normalizedHeaders.findIndex((value) => value.includes('استان') || value.includes('province'));
+    const axisCodeIndex = normalizedHeaders.findIndex((value) => value.includes('کدمحور') || value.includes('axiscode') || value.includes('routecode') || value === 'axis');
+    const axisNameIndex = normalizedHeaders.findIndex((value) => value.includes('ناممحور') || value.includes('axisname') || value.includes('routename'));
     if ([codeIndex, provinceIndex, axisCodeIndex].some((index) => index < 0)) {
       throw new BadRequestException('The registered traffic list must include system code, province and axis code columns.');
     }
@@ -589,7 +594,7 @@ export class RahcomService {
       organizationId: string; province: string; systemName: string; systemCode: string; latitude: number; longitude: number; axisCode?: string | null; announcedAxis?: string | null;
       details?: string | null; electricityBillId?: string | null; simIp?: string | null; radarIp?: string | null;
       cameraIp?: string | null; pcIp?: string | null; routerIp?: string | null; laptopIp?: string | null;
-      incidentType?: string | null; incidentDetails?: string | null;
+      incidentType?: string | null; incidentDetails?: string | null; longOutage?: boolean; longOutageReason?: string | null; longOutageDetails?: string | null;
     } => {
       const row = raw;
       const systemName = String(row.systemName ?? '').trim();
@@ -602,6 +607,9 @@ export class RahcomService {
         ...(row.details !== undefined ? { details: this.optionalText(row.details, 1000) } : {}),
         ...(row.axisCode !== undefined ? { axisCode: this.optionalText(row.axisCode, 100) } : {}),
         ...(row.announcedAxis !== undefined ? { announcedAxis: this.optionalText(row.announcedAxis, 120) } : {}),
+        ...(row.longOutage !== undefined ? { longOutage: row.longOutage } : {}),
+        ...(row.longOutageReason !== undefined ? { longOutageReason: row.longOutageReason } : {}),
+        ...(row.longOutageDetails !== undefined ? { longOutageDetails: this.optionalText(row.longOutageDetails, 1000) } : {}),
         ...(row.incidentType !== undefined ? { incidentType: row.incidentType } : {}),
         ...(row.incidentDetails !== undefined ? { incidentDetails: this.optionalText(row.incidentDetails, 1000) } : {}),
         ...(row.electricityBillId !== undefined ? { electricityBillId: this.optionalText(row.electricityBillId, 120) } : {}),
@@ -617,12 +625,12 @@ export class RahcomService {
     const codes = new Set<string>();
     for (const row of rows) { if (codes.has(row.systemCode)) throw new BadRequestException(`Duplicate system code: ${row.systemCode}`); codes.add(row.systemCode); }
     await this.prisma.$transaction(rows.map((row) => {
-      const { details, axisCode, announcedAxis, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, incidentType, incidentDetails, ...required } = row;
-      const optionalData = { details, axisCode, announcedAxis, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, incidentType, incidentDetails };
+      const { details, axisCode, announcedAxis, longOutage, longOutageReason, longOutageDetails, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, incidentType, incidentDetails, ...required } = row;
+      const optionalData = { details, axisCode, announcedAxis, longOutage, longOutageReason, longOutageDetails, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, incidentType, incidentDetails };
       return this.prisma.rahcomSystem.upsert({
         where: { organizationId_province_systemCode: { organizationId, province, systemCode: row.systemCode } },
         update: { ...required, ...Object.fromEntries(Object.entries(optionalData).filter(([, value]) => value !== undefined)) },
-        create: { ...required, details: details ?? null, axisCode: axisCode ?? null, announcedAxis: announcedAxis ?? null, electricityBillId: electricityBillId ?? null, simIp: simIp ?? null, radarIp: radarIp ?? null, cameraIp: cameraIp ?? null, pcIp: pcIp ?? null, routerIp: routerIp ?? null, laptopIp: laptopIp ?? null, incidentType: incidentType ?? null, incidentDetails: incidentDetails ?? null },
+        create: { ...required, details: details ?? null, axisCode: axisCode ?? null, announcedAxis: announcedAxis ?? null, longOutage: longOutage ?? Boolean(longOutageReason), longOutageReason: longOutageReason ?? null, longOutageDetails: longOutageDetails ?? null, electricityBillId: electricityBillId ?? null, simIp: simIp ?? null, radarIp: radarIp ?? null, cameraIp: cameraIp ?? null, pcIp: pcIp ?? null, routerIp: routerIp ?? null, laptopIp: laptopIp ?? null, incidentType: incidentType ?? null, incidentDetails: incidentDetails ?? null },
       });
     }));
     return { imported: rows.length };
@@ -644,6 +652,9 @@ export class RahcomService {
       ...(body.details !== undefined ? { details: this.optionalText(body.details, 1000) } : {}),
       ...(body.axisCode !== undefined ? { axisCode: this.optionalText(body.axisCode, 100) } : {}),
       ...(body.announcedAxis !== undefined ? { announcedAxis: this.optionalText(body.announcedAxis, 120) } : {}),
+      ...(body.longOutage !== undefined ? { longOutage: body.longOutage } : {}),
+      ...(body.longOutageReason !== undefined ? { longOutageReason: body.longOutageReason, longOutage: Boolean(body.longOutageReason) } : {}),
+      ...(body.longOutageDetails !== undefined ? { longOutageDetails: this.optionalText(body.longOutageDetails, 1000) } : {}),
       ...(body.incidentType !== undefined ? { incidentType: body.incidentType } : {}),
       ...(body.incidentDetails !== undefined ? { incidentDetails: this.optionalText(body.incidentDetails, 1000) } : {}),
       ...(body.electricityBillId !== undefined ? { electricityBillId: this.optionalText(body.electricityBillId, 120) } : {}),
@@ -707,6 +718,7 @@ export class RahcomService {
       ['VISIT_PLAN', String(body.visitPlan ?? '').trim().slice(0, 10000) || null],
       ['COMPLETION_REPORT', String(body.completionReport ?? '').trim().slice(0, 10000) || null],
       ['DAILY_NOTE', String(body.dailyNote ?? '').trim().slice(0, 10000) || null],
+      ['ACTIONS_DATA', String(body.actionsData ?? '').trim().slice(0, 10000) || null],
       ['EXCEL_UPDATE', body.excelUpdated ? (String(body.excelFileName ?? '').trim().slice(0, 255) || '__COMPLETED__') : null],
     ];
     await this.prisma.$transaction(async (tx) => {
