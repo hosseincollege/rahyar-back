@@ -22,6 +22,7 @@ import {
   UpdateRahcomMemberProvinceDto,
   UpdateRahcomSelectedProvinceDto,
   UpdateRahcomImportedTicketDescriptionDto,
+  ReplaceRahcomBillIdentifierListDto,
 } from './dto/rahcom.dto';
 import { RahcomService } from './rahcom.service';
 
@@ -93,6 +94,14 @@ export class RahcomController {
   @Get('road-list')
   getRoadList(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
     return this.service.getRoadList(user, query.province, query.date);
+  }
+  @Get('bill-identifiers')
+  getBillIdentifiers(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
+    return this.service.getBillIdentifiers(user, query.province);
+  }
+  @Put('bill-identifiers')
+  replaceBillIdentifiers(@CurrentUser() user: AuthenticatedUser, @Body() body: ReplaceRahcomBillIdentifierListDto) {
+    return this.service.replaceBillIdentifiers(user, body);
   }
   @Get('road-list/dates')
   getRoadListDates(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomTrafficSnapshotDatesQueryDto) {

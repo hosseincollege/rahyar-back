@@ -51,6 +51,7 @@ model Organization {
   rahcomSolarSpecialSystems RahcomSolarSpecialSystem[]
   rahcomImportedTickets RahcomImportedTicket[]
   rahcomRoadLists     RahcomRoadList[]
+  rahcomBillIdentifierLists RahcomBillIdentifierList[]
 
   @@index([installationId])
   @@index([status])

@@ -293,6 +293,7 @@ export class SettingsService {
       ),
     );
     const isDemoUser = membership.roles.some(({ role }) => role.key.toUpperCase() === 'DEMO_USER');
+    const isRahcomViewer = membership.roles.some(({ role }) => role.key.toUpperCase() === 'RAHCOM_VIEWER');
     const isOrganizationAdmin = membership.roles.some(({ role }) => ['ADMIN', 'SUPER_ADMIN'].includes(role.key.toUpperCase()));
     const canEdit = isOwner || permissions.has('settings.write');
     const canView = canEdit || permissions.has('settings.read');
@@ -300,7 +301,7 @@ export class SettingsService {
     const hasRahcomProvince = canManageRahcom || isDemoUser
       ? false
       : await this.hasRahcomProvinceAssignment(id, user.id);
-    const canViewRahcom = canManageRahcom || isDemoUser || hasRahcomProvince;
+    const canViewRahcom = canManageRahcom || isDemoUser || isRahcomViewer || hasRahcomProvince;
     return { canView, canViewSharedSettings: true, canEdit, canViewRahcom, canManageRahcom };
   }
 
