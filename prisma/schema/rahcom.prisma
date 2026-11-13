@@ -4,6 +4,8 @@ model RahcomSystem {
   province          String           @db.VarChar(80)
   systemName        String           @db.VarChar(200)
   systemCode        String           @db.VarChar(100)
+  stationName       String?          @map("station_name") @db.VarChar(200)
+  aggregationCode   String?          @map("aggregation_code") @db.VarChar(100)
   axisCode          String?          @db.VarChar(100)
   announcedAxis     String?          @map("announced_axis") @db.VarChar(120)
   longOutage        Boolean          @default(false) @map("long_outage")

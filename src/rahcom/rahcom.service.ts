@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../core/prisma/prisma.service';
 import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
 import type {
@@ -562,6 +563,8 @@ export class RahcomService {
     const provinceIndex = normalizedHeaders.findIndex((value) => value.includes('استان') || value.includes('province'));
     const axisCodeIndex = normalizedHeaders.findIndex((value) => value.includes('کدمحور') || value.includes('axiscode') || value.includes('routecode') || value === 'axis');
     const axisNameIndex = normalizedHeaders.findIndex((value) => value.includes('ناممحور') || value.includes('axisname') || value.includes('routename'));
+    const stationNameIndex = normalizedHeaders.findIndex((value) => value.includes('نامایستگاه') || value.includes('stationname'));
+    const aggregationCodeIndex = normalizedHeaders.findIndex((value) => value.includes('کدتجمیع') || value.includes('aggregationcode'));
     if ([codeIndex, provinceIndex, axisCodeIndex].some((index) => index < 0)) {
       throw new BadRequestException('The registered traffic list must include system code, province and axis code columns.');
     }
@@ -569,6 +572,7 @@ export class RahcomService {
     const labelCounts = new Map<string, Map<string, number>>();
     const rowKeys: Array<{ key: string; systemCode: string }> = [];
     const listedSystems = new Set<string>();
+    const staticMetadataByKey = new Map<string, { province: string; systemCode: string; stationName: string; aggregationCode: string }>();
     for (const row of rows) {
       if (!Array.isArray(row)) continue;
       const province = rahcomProvinceIdFromLabel(String(row[provinceIndex] ?? ''));
@@ -577,6 +581,15 @@ export class RahcomService {
       const axisLabel = axisNameIndex >= 0 ? String(row[axisNameIndex] ?? '').trim() : '';
       if (!province || !systemCode) continue;
       listedSystems.add(`${province}\u0000${systemCode}`);
+      if (stationNameIndex >= 0 || aggregationCodeIndex >= 0) {
+        const metadataKey = `${province}\u0000${systemCode.toLocaleUpperCase()}`;
+        staticMetadataByKey.set(metadataKey, {
+          province,
+          systemCode,
+          stationName: stationNameIndex >= 0 ? String(row[stationNameIndex] ?? '').trim().slice(0, 200) : '',
+          aggregationCode: aggregationCodeIndex >= 0 ? String(row[aggregationCodeIndex] ?? '').trim().slice(0, 100) : '',
+        });
+      }
       if (!axisCode) continue;
       const key = `${province}\u0000${axisCode}`;
       const labels = labelCounts.get(key) ?? new Map<string, number>();
@@ -613,6 +626,24 @@ export class RahcomService {
       }));
     const results = await this.prisma.$transaction(mutations, { maxWait: 10_000, timeout: 30_000 });
     const updatedSystems = results.reduce((total, result) => total + ('count' in result ? result.count : 0), 0);
+    if (staticMetadataByKey.size) {
+      const metadataRows = [...staticMetadataByKey.values()];
+      const demoConstraint = demoOnly ? Prisma.sql`AND system."systemCode" LIKE ${`${this.demoSystemPrefix}%`}` : Prisma.empty;
+      for (let offset = 0; offset < metadataRows.length; offset += 500) {
+        const batch = metadataRows.slice(offset, offset + 500);
+        const values = Prisma.join(batch.map((row) => Prisma.sql`(${row.province}, ${row.systemCode}, ${row.stationName}, ${row.aggregationCode})`));
+        await this.prisma.$executeRaw(Prisma.sql`
+          UPDATE "rahcom_systems" AS system
+          SET "station_name" = CASE WHEN ${stationNameIndex >= 0} THEN input.station_name ELSE system."station_name" END,
+              "aggregation_code" = CASE WHEN ${aggregationCodeIndex >= 0} THEN input.aggregation_code ELSE system."aggregation_code" END
+          FROM (VALUES ${values}) AS input(province, system_code, station_name, aggregation_code)
+          WHERE system."organizationId" = ${organizationId}
+            AND system."province" = input.province
+            AND UPPER(system."systemCode") = UPPER(input.system_code)
+            ${demoConstraint}
+        `);
+      }
+    }
     return { updatedSystems, unmatchedSystems: Math.max(0, listedSystems.size - updatedSystems), axisGroups: assignments.size };
   }
   async importSystems(user: AuthenticatedUser, body: ImportRahcomSystemsDto) {
@@ -622,6 +653,7 @@ export class RahcomService {
     if (!province || province.length > 80 || !Array.isArray(body?.systems) || body.systems.length > 10000) throw new BadRequestException('Select a province and provide at most 10,000 rows.');
     const rows = body.systems.map((raw, index): {
       organizationId: string; province: string; systemName: string; systemCode: string; latitude: number; longitude: number; axisCode?: string | null; announcedAxis?: string | null;
+      stationName?: string | null; aggregationCode?: string | null;
       details?: string | null; electricityBillId?: string | null; simIp?: string | null; radarIp?: string | null;
       cameraIp?: string | null; pcIp?: string | null; routerIp?: string | null; laptopIp?: string | null;
       incidentType?: string | null; incidentDetails?: string | null; longOutage?: boolean; longOutageReason?: string | null; longOutageDetails?: string | null;
@@ -634,6 +666,8 @@ export class RahcomService {
       if (!systemName || !systemCode || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) throw new BadRequestException(`Invalid system row ${index + 1}. Check name, code, latitude and longitude.`);
       if (demoOnly && !systemCode.startsWith(this.demoSystemPrefix)) throw new ForbiddenException('Demo accounts can only import demo Rahcom systems.');
       const optionalData = {
+        ...(row.stationName !== undefined ? { stationName: this.optionalText(row.stationName, 200) } : {}),
+        ...(row.aggregationCode !== undefined ? { aggregationCode: this.optionalText(row.aggregationCode, 100) } : {}),
         ...(row.details !== undefined ? { details: this.optionalText(row.details, 1000) } : {}),
         ...(row.axisCode !== undefined ? { axisCode: this.optionalText(row.axisCode, 100) } : {}),
         ...(row.announcedAxis !== undefined ? { announcedAxis: this.optionalText(row.announcedAxis, 120) } : {}),
@@ -655,12 +689,12 @@ export class RahcomService {
     const codes = new Set<string>();
     for (const row of rows) { if (codes.has(row.systemCode)) throw new BadRequestException(`Duplicate system code: ${row.systemCode}`); codes.add(row.systemCode); }
     await this.prisma.$transaction(rows.map((row) => {
-      const { details, axisCode, announcedAxis, longOutage, longOutageReason, longOutageDetails, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, incidentType, incidentDetails, ...required } = row;
-      const optionalData = { details, axisCode, announcedAxis, longOutage, longOutageReason, longOutageDetails, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, incidentType, incidentDetails };
+      const { details, stationName, aggregationCode, axisCode, announcedAxis, longOutage, longOutageReason, longOutageDetails, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, incidentType, incidentDetails, ...required } = row;
+      const optionalData = { details, stationName, aggregationCode, axisCode, announcedAxis, longOutage, longOutageReason, longOutageDetails, electricityBillId, simIp, radarIp, cameraIp, pcIp, routerIp, laptopIp, incidentType, incidentDetails };
       return this.prisma.rahcomSystem.upsert({
         where: { organizationId_province_systemCode: { organizationId, province, systemCode: row.systemCode } },
         update: { ...required, ...Object.fromEntries(Object.entries(optionalData).filter(([, value]) => value !== undefined)) },
-        create: { ...required, details: details ?? null, axisCode: axisCode ?? null, announcedAxis: announcedAxis ?? null, longOutage: longOutage ?? Boolean(longOutageReason), longOutageReason: longOutageReason ?? null, longOutageDetails: longOutageDetails ?? null, electricityBillId: electricityBillId ?? null, simIp: simIp ?? null, radarIp: radarIp ?? null, cameraIp: cameraIp ?? null, pcIp: pcIp ?? null, routerIp: routerIp ?? null, laptopIp: laptopIp ?? null, incidentType: incidentType ?? null, incidentDetails: incidentDetails ?? null },
+        create: { ...required, details: details ?? null, stationName: stationName ?? null, aggregationCode: aggregationCode ?? null, axisCode: axisCode ?? null, announcedAxis: announcedAxis ?? null, longOutage: longOutage ?? Boolean(longOutageReason), longOutageReason: longOutageReason ?? null, longOutageDetails: longOutageDetails ?? null, electricityBillId: electricityBillId ?? null, simIp: simIp ?? null, radarIp: radarIp ?? null, cameraIp: cameraIp ?? null, pcIp: pcIp ?? null, routerIp: routerIp ?? null, laptopIp: laptopIp ?? null, incidentType: incidentType ?? null, incidentDetails: incidentDetails ?? null },
       });
     }));
     return { imported: rows.length };
@@ -679,6 +713,8 @@ export class RahcomService {
     if (!systemName || !systemCode || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) throw new BadRequestException('Invalid system fields.');
     if (demoOnly && !systemCode.startsWith(this.demoSystemPrefix)) throw new ForbiddenException('Demo accounts cannot move systems outside the demo dataset.');
     const optionalData = {
+      ...(body.stationName !== undefined ? { stationName: this.optionalText(body.stationName, 200) } : {}),
+      ...(body.aggregationCode !== undefined ? { aggregationCode: this.optionalText(body.aggregationCode, 100) } : {}),
       ...(body.details !== undefined ? { details: this.optionalText(body.details, 1000) } : {}),
       ...(body.axisCode !== undefined ? { axisCode: this.optionalText(body.axisCode, 100) } : {}),
       ...(body.announcedAxis !== undefined ? { announcedAxis: this.optionalText(body.announcedAxis, 120) } : {}),

@@ -21,6 +21,8 @@ import {
 export class RahcomSystemImportRowDto {
   @IsString() @MinLength(1) @MaxLength(200) systemName!: string;
   @IsString() @MinLength(1) @MaxLength(100) systemCode!: string;
+  @IsOptional() @IsString() @MaxLength(200) stationName?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) aggregationCode?: string | null;
   @IsOptional() @IsString() @MaxLength(100) axisCode?: string | null;
   @IsOptional() @IsString() @MaxLength(120) announcedAxis?: string | null;
   @IsOptional() @IsBoolean() longOutage?: boolean;
@@ -49,6 +51,8 @@ export class ImportRahcomSystemsDto {
 export class UpdateRahcomSystemDto {
   @IsOptional() @IsString() @MinLength(1) @MaxLength(200) systemName?: string;
   @IsOptional() @IsString() @MinLength(1) @MaxLength(100) systemCode?: string;
+  @IsOptional() @IsString() @MaxLength(200) stationName?: string | null;
+  @IsOptional() @IsString() @MaxLength(100) aggregationCode?: string | null;
   @IsOptional() @IsString() @MaxLength(100) axisCode?: string | null;
   @IsOptional() @IsString() @MaxLength(120) announcedAxis?: string | null;
   @IsOptional() @IsBoolean() longOutage?: boolean;
