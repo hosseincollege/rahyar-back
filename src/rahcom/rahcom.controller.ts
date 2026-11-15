@@ -5,6 +5,7 @@ import { RolesGuard } from '../core/auth/guards/roles.guard';
 import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
 import {
   CreateRahcomActivityDto,
+  CreateRahcomSystemDto,
   SaveRahcomDailyWorkflowDto,
   CreateRahcomSystemActivityDto,
   CreateRahcomSolarSnapshotDto,
@@ -42,6 +43,10 @@ export class RahcomController {
   @Get('systems')
   listSystems(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
     return this.service.listSystems(user, query.province);
+  }
+  @Post('systems')
+  createSystem(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomSystemDto) {
+    return this.service.createSystem(user, body);
   }
   @Post('systems/import')
   importSystems(@CurrentUser() user: AuthenticatedUser, @Body() body: ImportRahcomSystemsDto) {

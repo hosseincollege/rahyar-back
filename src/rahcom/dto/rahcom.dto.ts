@@ -30,8 +30,8 @@ export class RahcomSystemImportRowDto {
   @IsOptional() @IsString() @MaxLength(1000) longOutageDetails?: string | null;
   @IsOptional() @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE', 'WIDENING_RELOCATION']) incidentType?: string | null;
   @IsOptional() @IsString() @MaxLength(1000) incidentDetails?: string | null;
-  @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-90) @Max(90) latitude!: number;
-  @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-180) @Max(180) longitude!: number;
+  @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-90) @Max(90) latitude?: number | null;
+  @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-180) @Max(180) longitude?: number | null;
   @IsOptional() @IsString() @MaxLength(1000) details?: string | null;
   @IsOptional() @IsString() @MaxLength(120) electricityBillId?: string | null;
   @IsOptional() @IsString() @MaxLength(100) simIp?: string | null;
@@ -48,6 +48,17 @@ export class ImportRahcomSystemsDto {
   systems!: RahcomSystemImportRowDto[];
 }
 
+export class CreateRahcomSystemDto {
+  @IsString() @MinLength(1) @MaxLength(80) province!: string;
+  @IsString() @MinLength(1) @MaxLength(200) systemName!: string;
+  @IsString() @MinLength(1) @MaxLength(100) systemCode!: string;
+  @IsString() @MinLength(1) @MaxLength(100) axisCode!: string;
+  @IsString() @MinLength(1) @MaxLength(120) announcedAxis!: string;
+  @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-90) @Max(90) latitude?: number;
+  @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-180) @Max(180) longitude?: number;
+  @IsOptional() @IsString() @MaxLength(120) electricityBillId?: string | null;
+}
+
 export class UpdateRahcomSystemDto {
   @IsOptional() @IsString() @MinLength(1) @MaxLength(200) systemName?: string;
   @IsOptional() @IsString() @MinLength(1) @MaxLength(100) systemCode?: string;
@@ -60,8 +71,8 @@ export class UpdateRahcomSystemDto {
   @IsOptional() @IsString() @MaxLength(1000) longOutageDetails?: string | null;
   @IsOptional() @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE', 'WIDENING_RELOCATION']) incidentType?: string | null;
   @IsOptional() @IsString() @MaxLength(1000) incidentDetails?: string | null;
-  @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-90) @Max(90) latitude?: number;
-  @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-180) @Max(180) longitude?: number;
+  @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-90) @Max(90) latitude?: number | null;
+  @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-180) @Max(180) longitude?: number | null;
   @IsOptional() @IsString() @MaxLength(1000) details?: string | null;
   @IsOptional() @IsString() @MaxLength(120) electricityBillId?: string | null;
   @IsOptional() @IsString() @MaxLength(100) simIp?: string | null;

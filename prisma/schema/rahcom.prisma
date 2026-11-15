@@ -13,8 +13,8 @@ model RahcomSystem {
   longOutageDetails String?          @map("long_outage_details") @db.VarChar(1000)
   incidentType      String?          @db.VarChar(24)
   incidentDetails   String?          @db.VarChar(1000)
-  latitude          Float
-  longitude         Float
+  latitude          Float?
+  longitude         Float?
   details           String?
   electricityBillId String?          @db.VarChar(120)
   simIp             String?          @db.VarChar(100)

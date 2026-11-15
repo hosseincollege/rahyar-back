@@ -1,9 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../core/prisma/prisma.service';
 import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
 import type {
   CreateRahcomActivityDto,
+  CreateRahcomSystemDto,
   CreateRahcomSystemActivityDto,
   CreateRahcomSolarSnapshotDto,
   ReplaceRahcomSolarSpecialSystemsDto,
@@ -646,13 +647,39 @@ export class RahcomService {
     }
     return { updatedSystems, unmatchedSystems: Math.max(0, listedSystems.size - updatedSystems), axisGroups: assignments.size };
   }
+  async createSystem(user: AuthenticatedUser, body: CreateRahcomSystemDto) {
+    const access = await this.authorize(user, true);
+    const { organizationId, demoOnly } = access;
+    const province = this.scopedProvince(access, String(body?.province ?? '').trim()) ?? '';
+    const systemName = String(body?.systemName ?? '').trim();
+    const systemCode = String(body?.systemCode ?? '').trim();
+    const axisCode = String(body?.axisCode ?? '').trim();
+    const announcedAxis = String(body?.announcedAxis ?? '').trim();
+    const hasLatitude = body?.latitude !== undefined;
+    const hasLongitude = body?.longitude !== undefined;
+    const latitude = hasLatitude ? Number(body.latitude) : null;
+    const longitude = hasLongitude ? Number(body.longitude) : null;
+    if (!province || !systemName || !systemCode || !axisCode || !announcedAxis) throw new BadRequestException('Province, system name, system code, axis name and axis code are required.');
+    if (hasLatitude !== hasLongitude || (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) || (longitude !== null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180))) {
+      throw new BadRequestException('Enter both valid coordinates, or leave both empty.');
+    }
+    if (demoOnly && !systemCode.startsWith(this.demoSystemPrefix)) throw new ForbiddenException('Demo accounts can only create demo Rahcom systems.');
+    const existing = await this.prisma.rahcomSystem.findFirst({ where: { organizationId, province, systemCode }, select: { id: true } });
+    if (existing) throw new ConflictException('A system with this code already exists in the selected province.');
+    return this.prisma.rahcomSystem.create({
+      data: {
+        organizationId, province, systemName, systemCode, axisCode, announcedAxis, latitude, longitude,
+        electricityBillId: this.optionalText(body.electricityBillId, 120),
+      },
+    });
+  }
   async importSystems(user: AuthenticatedUser, body: ImportRahcomSystemsDto) {
     const access = await this.authorize(user, true);
     const { organizationId, demoOnly } = access;
     const province = this.scopedProvince(access, String(body?.province ?? '').trim()) ?? '';
     if (!province || province.length > 80 || !Array.isArray(body?.systems) || body.systems.length > 10000) throw new BadRequestException('Select a province and provide at most 10,000 rows.');
     const rows = body.systems.map((raw, index): {
-      organizationId: string; province: string; systemName: string; systemCode: string; latitude: number; longitude: number; axisCode?: string | null; announcedAxis?: string | null;
+      organizationId: string; province: string; systemName: string; systemCode: string; latitude: number | null; longitude: number | null; axisCode?: string | null; announcedAxis?: string | null;
       stationName?: string | null; aggregationCode?: string | null;
       details?: string | null; electricityBillId?: string | null; simIp?: string | null; radarIp?: string | null;
       cameraIp?: string | null; pcIp?: string | null; routerIp?: string | null; laptopIp?: string | null;
@@ -661,9 +688,11 @@ export class RahcomService {
       const row = raw;
       const systemName = String(row.systemName ?? '').trim();
       const systemCode = String(row.systemCode ?? '').trim();
-      const latitude = Number(row.latitude);
-      const longitude = Number(row.longitude);
-      if (!systemName || !systemCode || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) throw new BadRequestException(`Invalid system row ${index + 1}. Check name, code, latitude and longitude.`);
+      const hasLatitude = row.latitude !== undefined && row.latitude !== null;
+      const hasLongitude = row.longitude !== undefined && row.longitude !== null;
+      const latitude = hasLatitude ? Number(row.latitude) : null;
+      const longitude = hasLongitude ? Number(row.longitude) : null;
+      if (!systemName || !systemCode || hasLatitude !== hasLongitude || (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) || (longitude !== null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180))) throw new BadRequestException(`Invalid system row ${index + 1}. Enter both valid coordinates, or leave both empty.`);
       if (demoOnly && !systemCode.startsWith(this.demoSystemPrefix)) throw new ForbiddenException('Demo accounts can only import demo Rahcom systems.');
       const optionalData = {
         ...(row.stationName !== undefined ? { stationName: this.optionalText(row.stationName, 200) } : {}),
@@ -708,9 +737,9 @@ export class RahcomService {
     this.scopedProvince(access, existing.province);
     const systemName = body.systemName === undefined ? existing.systemName : String(body.systemName ?? '').trim();
     const systemCode = body.systemCode === undefined ? existing.systemCode : String(body.systemCode ?? '').trim();
-    const latitude = body.latitude === undefined ? existing.latitude : Number(body.latitude);
-    const longitude = body.longitude === undefined ? existing.longitude : Number(body.longitude);
-    if (!systemName || !systemCode || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) throw new BadRequestException('Invalid system fields.');
+    const latitude = body.latitude === undefined ? existing.latitude : body.latitude === null ? null : Number(body.latitude);
+    const longitude = body.longitude === undefined ? existing.longitude : body.longitude === null ? null : Number(body.longitude);
+    if (!systemName || !systemCode || (latitude === null) !== (longitude === null) || (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) || (longitude !== null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180))) throw new BadRequestException('Enter both valid coordinates, or leave both empty.');
     if (demoOnly && !systemCode.startsWith(this.demoSystemPrefix)) throw new ForbiddenException('Demo accounts cannot move systems outside the demo dataset.');
     const optionalData = {
       ...(body.stationName !== undefined ? { stationName: this.optionalText(body.stationName, 200) } : {}),
