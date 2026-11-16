@@ -249,14 +249,21 @@ export class SettingsController {
   @Put('roles/:organizationId')
   async saveRoles(
     @Param('organizationId') organizationId: string,
-    @Body() roles: SaveRoleDto[],
+    @Body() roles: SaveRoleDto[] | { roles?: SaveRoleDto[] },
     @CurrentUser() user: AuthenticatedUser,
   ) {
     if (!organizationId || organizationId.trim() === '') {
       throw new BadRequestException('شناسه سازمان نامعتبر است.');
     }
 
-    const payload = Array.isArray(roles) ? roles : (roles as any)?.roles || [];
+    const payload = Array.isArray(roles)
+      ? roles
+      : roles && typeof roles === 'object' && 'roles' in roles
+        ? roles.roles
+        : undefined;
+    if (!Array.isArray(payload)) {
+      throw new BadRequestException('ÙØ±Ù…Øª ÙÙ‡Ø±Ø³Øª Ù†Ù‚Ø´â€ŒÙ‡Ø§ Ù†Ø§Ù…Ø¹ØªØ¨Ø± Ø§Ø³Øª.');
+    }
     return this.settingsService.saveRoles(organizationId.trim(), payload, user);
   }
 
@@ -378,7 +385,7 @@ export class SettingsController {
   @Put('users/:organizationId')
   async saveUsers(
     @Param('organizationId') organizationId: string,
-    @Body() usersPayload: any,
+    @Body() usersPayload: unknown,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     if (!organizationId || organizationId.trim() === '') {
@@ -386,14 +393,18 @@ export class SettingsController {
     }
 
     // استخراج ایمن لیست کاربران چه به صورت آرایه مستقیم و چه آبجکت
-    let usersList: any[] = [];
+    let usersList: unknown[] | undefined;
     if (Array.isArray(usersPayload)) {
       usersList = usersPayload;
-    } else if (usersPayload && Array.isArray(usersPayload.users)) {
+    } else if (
+      usersPayload &&
+      typeof usersPayload === 'object' &&
+      'users' in usersPayload &&
+      Array.isArray(usersPayload.users)
+    ) {
       usersList = usersPayload.users;
-    } else if (usersPayload && Array.isArray(usersPayload.data)) {
-      usersList = usersPayload.data;
     }
+    if (!usersList) throw new BadRequestException('Invalid users payload.');
 
     return this.settingsService.saveUsers(
       organizationId.trim(),

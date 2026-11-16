@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { AuditAction } from '@prisma/client';
+import type { Prisma, User } from '@prisma/client';
 
 import { PrismaService } from '../core/prisma/prisma.service';
 import { normalizeNationalId } from '../core/national-id';
@@ -31,6 +32,95 @@ import { OrganizationLogoStorageService } from './company/organization-logo-stor
 import { ORGANIZATION_ACCENT_COLORS } from './appearance-palette.backup';
 
 const VISITOR_TIME_ZONE = 'Asia/Tehran';
+
+type SaveUserInput = {
+  id?: string;
+  nationalId?: string | null;
+  nationalCode?: string | null;
+  email?: string | null;
+  username?: string;
+  name?: string;
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+  isActive?: boolean;
+  status?: string;
+  password?: string;
+  phone?: string | null;
+  branchId?: string | null;
+  departmentId?: string | null;
+  roleIds?: string[];
+  role?: string | null;
+  roleKey?: string | null;
+  roles?: Array<string | { id?: string; key?: string; name?: string }>;
+};
+
+function isSaveUserRole(value: unknown): value is NonNullable<SaveUserInput['roles']>[number] {
+  if (typeof value === 'string') return true;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const role = value as Record<string, unknown>;
+  return ['id', 'key', 'name'].every((key) => role[key] === undefined || typeof role[key] === 'string');
+}
+
+function parseSaveUserInput(value: unknown): SaveUserInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new BadRequestException('Invalid user entry.');
+  }
+
+  const item = value as Record<string, unknown>;
+  const requiredStringFields = [
+    'id', 'username', 'name', 'fullName', 'firstName', 'lastName', 'status', 'password',
+  ] as const;
+  const nullableStringFields = [
+    'nationalId', 'nationalCode', 'email', 'phone', 'branchId', 'departmentId', 'role', 'roleKey',
+  ] as const;
+
+  for (const key of requiredStringFields) {
+    if (item[key] !== undefined && typeof item[key] !== 'string') {
+      throw new BadRequestException(`Invalid user field: ${key}.`);
+    }
+  }
+  for (const key of nullableStringFields) {
+    if (item[key] !== undefined && item[key] !== null && typeof item[key] !== 'string') {
+      throw new BadRequestException(`Invalid user field: ${key}.`);
+    }
+  }
+  if (item.isActive !== undefined && typeof item.isActive !== 'boolean') {
+    throw new BadRequestException('Invalid user field: isActive.');
+  }
+  if (item.roleIds !== undefined && (!Array.isArray(item.roleIds) || !item.roleIds.every((roleId) => typeof roleId === 'string'))) {
+    throw new BadRequestException('Invalid user field: roleIds.');
+  }
+  if (item.roles !== undefined && (!Array.isArray(item.roles) || !item.roles.every(isSaveUserRole))) {
+    throw new BadRequestException('Invalid user field: roles.');
+  }
+
+  const optionalText = (key: string) => typeof item[key] === 'string' ? item[key] : undefined;
+  const optionalNullableText = (key: string) => typeof item[key] === 'string' || item[key] === null
+    ? item[key]
+    : undefined;
+  return {
+    id: optionalText('id'),
+    nationalId: optionalNullableText('nationalId'),
+    nationalCode: optionalNullableText('nationalCode'),
+    email: optionalNullableText('email'),
+    username: optionalText('username'),
+    name: optionalText('name'),
+    fullName: optionalText('fullName'),
+    firstName: optionalText('firstName'),
+    lastName: optionalText('lastName'),
+    isActive: typeof item.isActive === 'boolean' ? item.isActive : undefined,
+    status: optionalText('status'),
+    password: optionalText('password'),
+    phone: optionalNullableText('phone'),
+    branchId: optionalNullableText('branchId'),
+    departmentId: optionalNullableText('departmentId'),
+    roleIds: Array.isArray(item.roleIds) ? item.roleIds.filter((roleId): roleId is string => typeof roleId === 'string') : undefined,
+    role: optionalNullableText('role'),
+    roleKey: optionalNullableText('roleKey'),
+    roles: Array.isArray(item.roles) ? item.roles.filter(isSaveUserRole) : undefined,
+  };
+}
 
 function normalizeOrganizationAccent<T extends { accentPreset: string }>(settings: T) {
   if (settings.accentPreset === 'custom') return settings;
@@ -547,6 +637,10 @@ export class SettingsService {
     rolesDto: SaveRoleDto[],
     user: AuthenticatedUser,
   ) {
+    if (!Array.isArray(rolesDto)) {
+      throw new BadRequestException('Invalid roles payload.');
+    }
+
     const access = await this.getOrganizationAccess(organizationId, user);
     if (!access.canEdit) {
       throw new ForbiddenException();
@@ -560,6 +654,21 @@ export class SettingsService {
 
       if (!org) {
         throw new NotFoundException(`سازمان با شناسه ${organizationId} یافت نشد.`);
+      }
+
+      const requestedPermissionKeys = [...new Set(rolesDto.flatMap((role) => role.permissions ?? []))];
+      if (requestedPermissionKeys.length > 0) {
+        const knownPermissions = await tx.permission.findMany({
+          where: { key: { in: requestedPermissionKeys } },
+          select: { key: true },
+        });
+        const knownPermissionKeys = new Set(knownPermissions.map(({ key }) => key));
+        const unknownPermissionKeys = requestedPermissionKeys.filter((key) => !knownPermissionKeys.has(key));
+        if (unknownPermissionKeys.length > 0) {
+          throw new BadRequestException(
+            `Unknown permission keys: ${unknownPermissionKeys.join(', ')}`,
+          );
+        }
       }
 
       const processedRoleIds: string[] = [];
@@ -732,9 +841,13 @@ export class SettingsService {
    */
   async saveUsers(
     organizationId: string,
-    users: any[],
+    users: unknown[],
     actor: AuthenticatedUser,
   ) {
+    if (!Array.isArray(users)) {
+      throw new BadRequestException('Invalid users payload.');
+    }
+
     const access = await this.getOrganizationAccess(organizationId, actor);
     if (!access.canEdit) {
       throw new ForbiddenException('مجوز ویرایش کاربران این سازمان را ندارید.');
@@ -757,9 +870,10 @@ export class SettingsService {
         },
       });
 
-      for (const item of users) {
+      for (const input of users) {
+        const item = parseSaveUserInput(input);
         const nationalId = normalizeNationalId(item.nationalId ?? item.nationalCode);
-        let user: any = null;
+        let user: User | null = null;
 
         if (item.id) {
           user = await tx.user.findUnique({ where: { id: item.id } });
@@ -777,6 +891,12 @@ export class SettingsService {
               select: { status: true },
             })
           : null;
+
+        if (user && !previousMembership) {
+          throw new ConflictException(
+            'این حساب عضو این سازمان نیست. برای افزودن حساب موجود، ابتدا فرایند دعوت و پذیرش را کامل کنید.',
+          );
+        }
 
         const fullName = (item.name || item.fullName || '').trim();
         let derivedFirstName = item.firstName;
@@ -832,7 +952,7 @@ export class SettingsService {
             },
           });
         } else {
-          const updateData: any = {
+          const updateData: Prisma.UserUpdateInput = {
             firstName,
             lastName,
             ...(item.phone !== undefined && { phone: item.phone }),
@@ -932,7 +1052,10 @@ export class SettingsService {
         if (item.role) requestedRoles.push(item.role);
         if (item.roleKey) requestedRoles.push(item.roleKey);
         if (Array.isArray(item.roles)) {
-          requestedRoles.push(...item.roles);
+          for (const role of item.roles) {
+            if (typeof role === 'string') requestedRoles.push(role);
+            else requestedRoles.push(...[role.id, role.key, role.name].filter((key): key is string => Boolean(key)));
+          }
         }
 
         // پیدا کردن ID نقش‌های متناظر
@@ -1407,11 +1530,17 @@ export class SettingsService {
 
           let savedBranch;
           if (branch.id) {
-            savedBranch = await tx.branch.upsert({
-              where: { id: branch.id },
-              update: data,
-              create: { ...data, id: branch.id, organizationId },
+            const existingBranch = await tx.branch.findFirst({
+              where: { id: branch.id, organizationId },
+              select: { id: true },
             });
+            savedBranch = existingBranch
+              ? await tx.branch.update({ where: { id: existingBranch.id }, data })
+              : await tx.branch.upsert({
+                  where: { organizationId_code: { organizationId, code: branch.code } },
+                  update: data,
+                  create: { ...data, organizationId },
+                });
           } else {
             savedBranch = await tx.branch.upsert({
               where: {
@@ -1456,10 +1585,24 @@ export class SettingsService {
         for (const b of existing) branchIdByName.set(b.name, b.id);
       }
 
+      const organizationBranchIds = new Set(
+        (await tx.branch.findMany({
+          where: { organizationId },
+          select: { id: true },
+        })).map(({ id }) => id),
+      );
+
       const resolveBranchId = (
         dept: ImportDepartmentItemDto,
       ): string | null => {
-        if (dept.branchId) return dept.branchId;
+        if (dept.branchId) {
+          if (!organizationBranchIds.has(dept.branchId)) {
+            throw new BadRequestException(
+              'شعبه انتخاب‌شده متعلق به این سازمان نیست یا وجود ندارد.',
+            );
+          }
+          return dept.branchId;
+        }
         if (dept.branchName) {
           const resolved = branchIdByName.get(dept.branchName);
           if (!resolved) {
@@ -1483,11 +1626,19 @@ export class SettingsService {
           };
 
           if (dept.id) {
-            await tx.department.upsert({
-              where: { id: dept.id },
-              update: data,
-              create: { ...data, id: dept.id, organizationId },
+            const existingDepartment = await tx.department.findFirst({
+              where: { id: dept.id, organizationId },
+              select: { id: true },
             });
+            if (existingDepartment) {
+              await tx.department.update({ where: { id: existingDepartment.id }, data });
+            } else {
+              await tx.department.upsert({
+                where: { organizationId_code: { organizationId, code: dept.code } },
+                update: data,
+                create: { ...data, organizationId },
+              });
+            }
           } else {
             await tx.department.upsert({
               where: {
