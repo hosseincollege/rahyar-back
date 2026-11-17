@@ -196,18 +196,48 @@ export class DepartmentStructureService {
     user: AuthenticatedUser,
   ) {
     const department = await this.authorizeDepartment(departmentId, user, true);
-    if (managerEmployeeId) {
-      await this.requireDepartmentEmployee(
-        department.organizationId,
-        departmentId,
-        managerEmployeeId,
-      );
-    }
+    try {
+      await this.prisma.$transaction(
+        async (tx) => {
+          if (managerEmployeeId) {
+            const manager = await tx.employee.findFirst({
+              where: {
+                id: managerEmployeeId,
+                organizationId: department.organizationId,
+                departmentId,
+              },
+              select: { id: true },
+            });
+            if (!manager)
+              throw new BadRequestException(
+                'مدیر باید عضو همین دپارتمان و سازمان باشد.',
+              );
+          }
 
-    await this.prisma.department.update({
-      where: { id: departmentId },
-      data: { managerEmployeeId: managerEmployeeId || null },
-    });
+          const update = await tx.department.updateMany({
+            where: {
+              id: departmentId,
+              organizationId: department.organizationId,
+            },
+            data: { managerEmployeeId: managerEmployeeId || null },
+          });
+          if (!update.count)
+            throw new ConflictException(
+              'اطلاعات دپارتمان تغییر کرده است. فهرست را تازه‌سازی کنید.',
+            );
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2034'
+      )
+        throw new ConflictException(
+          'اطلاعات سازمانی هم‌زمان تغییر کرده است. فهرست را تازه‌سازی کنید.',
+        );
+      throw error;
+    }
     return this.getOverview(departmentId, user);
   }
 
@@ -326,34 +356,72 @@ export class DepartmentStructureService {
     user: AuthenticatedUser,
   ) {
     const department = await this.authorizeDepartment(departmentId, user, true);
-    await this.requireDepartmentEmployee(
-      department.organizationId,
-      departmentId,
-      employeeId,
-    );
+    try {
+      await this.prisma.$transaction(
+        async (tx) => {
+          const employee = await tx.employee.findFirst({
+            where: {
+              id: employeeId,
+              organizationId: department.organizationId,
+              departmentId,
+            },
+            select: { id: true },
+          });
+          if (!employee)
+            throw new BadRequestException(
+              'کارمند باید عضو همین دپارتمان و سازمان باشد.',
+            );
 
-    if (managerId) {
-      if (managerId === employeeId) {
-        throw new BadRequestException(
-          'کارمند نمی‌تواند مدیر مستقیم خودش باشد.',
+          if (managerId) {
+            if (managerId === employeeId)
+              throw new BadRequestException(
+                'کارمند نمی‌تواند مدیر مستقیم خودش باشد.',
+              );
+            const manager = await tx.employee.findFirst({
+              where: {
+                id: managerId,
+                organizationId: department.organizationId,
+                departmentId,
+              },
+              select: { id: true },
+            });
+            if (!manager)
+              throw new BadRequestException(
+                'مدیر باید عضو همین دپارتمان و سازمان باشد.',
+              );
+            await this.ensureNoReportingCycle(
+              tx,
+              employeeId,
+              managerId,
+              department.organizationId,
+            );
+          }
+
+          const update = await tx.employee.updateMany({
+            where: {
+              id: employeeId,
+              organizationId: department.organizationId,
+              departmentId,
+            },
+            data: { managerId: managerId || null },
+          });
+          if (!update.count)
+            throw new ConflictException(
+              'انتساب کارمند تغییر کرده است. فهرست را تازه‌سازی کنید.',
+            );
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2034'
+      )
+        throw new ConflictException(
+          'ساختار گزارش‌دهی تغییر کرده است. فهرست را تازه‌سازی کنید.',
         );
-      }
-      await this.requireDepartmentEmployee(
-        department.organizationId,
-        departmentId,
-        managerId,
-      );
-      await this.ensureNoReportingCycle(
-        employeeId,
-        managerId,
-        department.organizationId,
-      );
+      throw error;
     }
-
-    await this.prisma.employee.update({
-      where: { id: employeeId },
-      data: { managerId: managerId || null },
-    });
     return this.getOverview(departmentId, user);
   }
 
@@ -367,32 +435,56 @@ export class DepartmentStructureService {
     if (dto.managerEmployeeId && !employeeIds.includes(dto.managerEmployeeId)) {
       employeeIds.push(dto.managerEmployeeId);
     }
-    await this.validateTeamEmployees(
-      department.organizationId,
-      departmentId,
-      employeeIds,
-      dto.managerEmployeeId,
-    );
-
     try {
-      const team = await this.prisma.departmentTeam.create({
-        data: {
-          organizationId: department.organizationId,
-          departmentId,
-          name: dto.name.trim(),
-          code: dto.code.trim(),
-          managerEmployeeId: dto.managerEmployeeId || null,
-          members: {
-            create: employeeIds.map((employeeId) => ({ employeeId })),
-          },
+      const team = await this.prisma.$transaction(
+        async (tx) => {
+          const currentDepartment = await tx.department.findFirst({
+            where: {
+              id: departmentId,
+              organizationId: department.organizationId,
+            },
+            select: { id: true },
+          });
+          if (!currentDepartment)
+            throw new ConflictException(
+              'اطلاعات دپارتمان تغییر کرده است. فهرست را تازه‌سازی کنید.',
+            );
+
+          await this.validateTeamEmployees(
+            tx.employee,
+            department.organizationId,
+            departmentId,
+            employeeIds,
+            dto.managerEmployeeId,
+          );
+          return tx.departmentTeam.create({
+            data: {
+              organizationId: department.organizationId,
+              departmentId,
+              name: dto.name.trim(),
+              code: dto.code.trim(),
+              managerEmployeeId: dto.managerEmployeeId || null,
+              members: {
+                create: employeeIds.map((employeeId) => ({ employeeId })),
+              },
+            },
+            select: { id: true },
+          });
         },
-        select: { id: true },
-      });
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
       return this.getOverview(departmentId, user).then((overview) => ({
         ...overview,
         savedTeamId: team.id,
       }));
     } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2034'
+      )
+        throw new ConflictException(
+          'اعضای دپارتمان هم‌زمان تغییر کردند. فهرست را تازه‌سازی کنید.',
+        );
       this.handleTeamError(error);
     }
   }
@@ -404,7 +496,7 @@ export class DepartmentStructureService {
   ) {
     const team = await this.prisma.departmentTeam.findUnique({
       where: { id: teamId },
-      include: { members: { select: { employeeId: true } } },
+      select: { id: true, departmentId: true },
     });
     if (!team) throw new NotFoundException('تیم موردنظر پیدا نشد.');
     const department = await this.authorizeDepartment(
@@ -412,48 +504,80 @@ export class DepartmentStructureService {
       user,
       true,
     );
-    const employeeIds =
-      dto.employeeIds === undefined
-        ? team.members.map((member) => member.employeeId)
-        : [...new Set(dto.employeeIds)];
-    const managerEmployeeId =
-      dto.managerEmployeeId === undefined
-        ? team.managerEmployeeId
-        : dto.managerEmployeeId;
-
-    if (managerEmployeeId && !employeeIds.includes(managerEmployeeId)) {
-      throw new BadRequestException('سرپرست تیم باید عضو همان تیم باشد.');
-    }
-    await this.validateTeamEmployees(
-      department.organizationId,
-      team.departmentId,
-      employeeIds,
-      managerEmployeeId,
-    );
-
     try {
-      await this.prisma.$transaction(async (tx) => {
-        await tx.departmentTeam.update({
-          where: { id: teamId },
-          data: {
-            ...(dto.name !== undefined && { name: dto.name.trim() }),
-            ...(dto.code !== undefined && { code: dto.code.trim() }),
-            ...(dto.managerEmployeeId !== undefined && {
-              managerEmployeeId: dto.managerEmployeeId || null,
-            }),
-          },
-        });
-        if (dto.employeeIds !== undefined) {
-          await tx.departmentTeamMember.deleteMany({ where: { teamId } });
-          if (employeeIds.length) {
-            await tx.departmentTeamMember.createMany({
-              data: employeeIds.map((employeeId) => ({ teamId, employeeId })),
-              skipDuplicates: true,
-            });
+      await this.prisma.$transaction(
+        async (tx) => {
+          const currentTeam = await tx.departmentTeam.findFirst({
+            where: {
+              id: teamId,
+              departmentId: team.departmentId,
+              organizationId: department.organizationId,
+            },
+            include: { members: { select: { employeeId: true } } },
+          });
+          if (!currentTeam)
+            throw new ConflictException(
+              'اطلاعات تیم تغییر کرده است. فهرست را تازه‌سازی کنید.',
+            );
+
+          const employeeIds =
+            dto.employeeIds === undefined
+              ? currentTeam.members.map((member) => member.employeeId)
+              : [...new Set(dto.employeeIds)];
+          const managerEmployeeId =
+            dto.managerEmployeeId === undefined
+              ? currentTeam.managerEmployeeId
+              : dto.managerEmployeeId;
+
+          if (managerEmployeeId && !employeeIds.includes(managerEmployeeId))
+            throw new BadRequestException('سرپرست تیم باید عضو همان تیم باشد.');
+          await this.validateTeamEmployees(
+            tx.employee,
+            department.organizationId,
+            team.departmentId,
+            employeeIds,
+            managerEmployeeId,
+          );
+
+          const update = await tx.departmentTeam.updateMany({
+            where: {
+              id: teamId,
+              departmentId: team.departmentId,
+              organizationId: department.organizationId,
+            },
+            data: {
+              ...(dto.name !== undefined && { name: dto.name.trim() }),
+              ...(dto.code !== undefined && { code: dto.code.trim() }),
+              ...(dto.managerEmployeeId !== undefined && {
+                managerEmployeeId: dto.managerEmployeeId || null,
+              }),
+            },
+          });
+          if (!update.count)
+            throw new ConflictException(
+              'اطلاعات تیم تغییر کرده است. فهرست را تازه‌سازی کنید.',
+            );
+
+          if (dto.employeeIds !== undefined) {
+            await tx.departmentTeamMember.deleteMany({ where: { teamId } });
+            if (employeeIds.length) {
+              await tx.departmentTeamMember.createMany({
+                data: employeeIds.map((employeeId) => ({ teamId, employeeId })),
+                skipDuplicates: true,
+              });
+            }
           }
-        }
-      });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
     } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2034'
+      )
+        throw new ConflictException(
+          'اعضای تیم هم‌زمان تغییر کردند. فهرست را تازه‌سازی کنید.',
+        );
       this.handleTeamError(error);
     }
 
@@ -466,8 +590,22 @@ export class DepartmentStructureService {
       select: { id: true, departmentId: true },
     });
     if (!team) throw new NotFoundException('تیم موردنظر پیدا نشد.');
-    await this.authorizeDepartment(team.departmentId, user, true);
-    await this.prisma.departmentTeam.delete({ where: { id: teamId } });
+    const department = await this.authorizeDepartment(
+      team.departmentId,
+      user,
+      true,
+    );
+    const deletion = await this.prisma.departmentTeam.deleteMany({
+      where: {
+        id: teamId,
+        departmentId: team.departmentId,
+        organizationId: department.organizationId,
+      },
+    });
+    if (!deletion.count)
+      throw new ConflictException(
+        'اطلاعات تیم تغییر کرده است. فهرست را تازه‌سازی کنید.',
+      );
     return this.getOverview(team.departmentId, user);
   }
 
@@ -488,13 +626,14 @@ export class DepartmentStructureService {
   }
 
   private async validateTeamEmployees(
+    employeeModel: Prisma.TransactionClient['employee'],
     organizationId: string,
     departmentId: string,
     employeeIds: string[],
     managerEmployeeId?: string | null,
   ) {
     if (employeeIds.length) {
-      const count = await this.prisma.employee.count({
+      const count = await employeeModel.count({
         where: {
           id: { in: employeeIds },
           organizationId,
@@ -514,6 +653,7 @@ export class DepartmentStructureService {
   }
 
   private async ensureNoReportingCycle(
+    tx: Prisma.TransactionClient,
     employeeId: string,
     managerId: string,
     organizationId: string,
@@ -529,7 +669,7 @@ export class DepartmentStructureService {
       }
       visited.add(currentId);
       const current: { managerId: string | null } | null =
-        await this.prisma.employee.findFirst({
+        await tx.employee.findFirst({
           where: { id: currentId, organizationId },
           select: { managerId: true },
         });

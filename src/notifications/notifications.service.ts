@@ -383,68 +383,99 @@ export class NotificationsService {
     });
     if (active.length !== ids.length)
       throw new NotFoundException('Mentioned user was not found.');
-    const comment = await this.prisma.announcementComment.create({
-      data: {
-        announcementId: id,
-        userId: user.id,
-        body: dto.body.trim(),
-        mentions: { create: ids.map((userId) => ({ userId })) },
-      },
-      include: {
-        user: { select: { firstName: true, lastName: true } },
-        mentions: { select: { userId: true } },
-      },
-    });
-    const targets = ids.filter((userId) => userId !== user.id);
-    if (targets.length)
-      await this.prisma.notification.createMany({
-        data: targets.map((recipientUserId) => ({
-          organizationId: item.organizationId,
-          recipientUserId,
-          source: 'announcements',
-          eventKey: 'announcement.mentioned',
+    return this.prisma.$transaction(async (tx) => {
+      const comment = await tx.announcementComment.create({
+        data: {
           announcementId: id,
-          title: {
-            fa: 'شما در یک اطلاعیه منشن شدید',
-            en: 'You were mentioned in an announcement',
-            ar: 'تمت الإشارة إليك في إعلان',
-            'zh-CN': '您在公告中被提及',
-            fr: 'Vous avez été mentionné dans une annonce',
-            es: 'Te mencionaron en un anuncio',
-            de: 'Sie wurden in einer Mitteilung erwähnt',
-            ru: 'Вас упомянули в объявлении',
-            ja: 'お知らせであなたがメンションされました',
-            'pt-BR': 'Você foi mencionado em um comunicado',
-          },
-          body: {
-            fa: item.title,
-            en: item.title,
-            ar: item.title,
-            'zh-CN': item.title,
-            fr: item.title,
-            es: item.title,
-            de: item.title,
-            ru: item.title,
-            ja: item.title,
-            'pt-BR': item.title,
-          },
-          href: '/settings/announcements',
-          metadata: { announcementId: id, commentId: comment.id },
-        })),
+          userId: user.id,
+          body: dto.body.trim(),
+          mentions: { create: ids.map((userId) => ({ userId })) },
+        },
+        include: {
+          user: { select: { firstName: true, lastName: true } },
+          mentions: { select: { userId: true } },
+        },
       });
-    return comment;
+      const targets = ids.filter((userId) => userId !== user.id);
+      if (targets.length)
+        await tx.notification.createMany({
+          data: targets.map((recipientUserId) => ({
+            organizationId: item.organizationId,
+            recipientUserId,
+            source: 'announcements',
+            eventKey: 'announcement.mentioned',
+            announcementId: id,
+            title: {
+              fa: 'شما در یک اطلاعیه منشن شدید',
+              en: 'You were mentioned in an announcement',
+              ar: 'تمت الإشارة إليك في إعلان',
+              'zh-CN': '您在公告中被提及',
+              fr: 'Vous avez été mentionné dans une annonce',
+              es: 'Te mencionaron en un anuncio',
+              de: 'Sie wurden in einer Mitteilung erwähnt',
+              ru: 'Вас упомянули в объявлении',
+              ja: 'お知らせであなたがメンションされました',
+              'pt-BR': 'Você foi mencionado em um comunicado',
+            },
+            body: {
+              fa: item.title,
+              en: item.title,
+              ar: item.title,
+              'zh-CN': item.title,
+              fr: item.title,
+              es: item.title,
+              de: item.title,
+              ru: item.title,
+              ja: item.title,
+              'pt-BR': item.title,
+            },
+            href: '/settings/announcements',
+            metadata: { announcementId: id, commentId: comment.id },
+          })),
+        });
+      return comment;
+    });
   }
 
   async deleteComment(user: AuthenticatedUser, id: string, commentId: string) {
+    const organizationId = user.organizationId;
+    if (!organizationId)
+      throw new NotFoundException('Announcement was not found.');
     await this.visibleAnnouncement(user, id);
     const access = await this.getAnnouncementAccess(user);
     const comment = await this.prisma.announcementComment.findFirst({
       where: { id: commentId, announcementId: id },
+      select: { userId: true },
     });
     if (!comment) throw new NotFoundException('Comment was not found.');
     if (!access.canManage && comment.userId !== user.id)
       throw new ForbiddenException('Cannot delete this comment.');
-    await this.prisma.announcementComment.delete({ where: { id: commentId } });
+    const result = await this.prisma.announcementComment.deleteMany({
+      where: {
+        id: commentId,
+        announcementId: id,
+        ...(!access.canManage ? { userId: user.id } : {}),
+        announcement: {
+          organizationId,
+          isActive: true,
+          OR: [
+            { branchId: null },
+            {
+              branch: {
+                employees: {
+                  some: {
+                    organizationId,
+                    userId: user.id,
+                    status: 'ACTIVE',
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    });
+    if (!result.count) throw new NotFoundException('Comment was not found.');
     return { deleted: true };
   }
 

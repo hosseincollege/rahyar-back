@@ -73,6 +73,23 @@ export class ImportRahcomSystemsDto {
   systems!: RahcomSystemImportRowDto[];
 }
 
+export class RahcomSystemImportBatchRowDto extends RahcomSystemImportRowDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  @Matches(/^[a-z]+(?:-[a-z]+)*$/)
+  province!: string;
+}
+
+export class ImportRahcomSystemsBatchDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(10000)
+  @ValidateNested({ each: true })
+  @Type(() => RahcomSystemImportBatchRowDto)
+  systems!: RahcomSystemImportBatchRowDto[];
+}
+
 export class CreateRahcomSystemDto {
   @IsString() @MinLength(1) @MaxLength(80) province!: string;
   @IsString() @MinLength(1) @MaxLength(200) systemName!: string;
@@ -149,6 +166,33 @@ export class RahcomActivitiesQueryDto {
 export class RahcomProvinceQueryDto {
   @IsOptional() @IsString() @MaxLength(80) province?: string;
   @IsOptional() @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) date?: string;
+}
+
+export class RahcomSystemSearchQueryDto {
+  @IsOptional() @IsString() @MaxLength(80) province?: string;
+  @IsString() @MinLength(1) @MaxLength(100) q!: string;
+}
+
+export class RahcomSystemLookupDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  @Matches(/^[a-z]+(?:-[a-z]+)*$/)
+  province!: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(250)
+  @IsString({ each: true })
+  @MaxLength(100, { each: true })
+  ids?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(250)
+  @IsString({ each: true })
+  @MaxLength(100, { each: true })
+  codes?: string[];
 }
 
 export class RahcomTrafficSnapshotDatesQueryDto {

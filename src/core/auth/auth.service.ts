@@ -11,6 +11,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { Prisma } from '@prisma/client';
 import { createHmac } from 'node:crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
@@ -61,7 +62,8 @@ export class AuthService {
       throw new ConflictException('کاربری با این مشخصات قبلاً ثبت شده است');
     }
 
-    const { user, organizationId } = await this.prisma.$transaction(
+    // prettier-ignore
+    const registerOnce = () => this.prisma.$transaction(
       async (tx) => {
         if ((await tx.user.count()) > 0) {
           throw new ForbiddenException(
@@ -123,7 +125,26 @@ export class AuthService {
       },
       { isolationLevel: 'Serializable' },
     );
-    return this.createAuthResponse(user, organizationId);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const { user, organizationId } = await registerOnce();
+        return this.createAuthResponse(user, organizationId);
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError) {
+          if (error.code === 'P2002')
+            throw new ConflictException(
+              'کاربری با این مشخصات قبلاً ثبت شده است',
+            );
+          if (error.code === 'P2034' && attempt < 2) continue;
+          if (error.code === 'P2034' && (await this.prisma.user.count()) > 0)
+            throw new ForbiddenException(
+              'ثبت‌نام عمومی بسته است؛ حساب کاربری را مالک سامانه ایجاد می‌کند.',
+            );
+        }
+        throw error;
+      }
+    }
+    throw new ConflictException('ثبت حساب اولیه تکمیل نشد.');
   }
 
   async login(dto: LoginDto) {

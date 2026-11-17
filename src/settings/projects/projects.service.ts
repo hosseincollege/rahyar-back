@@ -196,49 +196,65 @@ export class ProjectsService {
 
   async update(id: string, dto: UpdateProjectDto, user: AuthenticatedUser) {
     const organizationId = await this.getOrganizationId(user, true);
-    const project = await this.prisma.project.findFirst({
-      where: { id, organizationId },
-    });
-    if (!project) throw new NotFoundException('پروژه یافت نشد.');
-
-    // در صورتی که اعضای پروژه ویرایش شده باشند
-    if (dto.memberUserIds) {
-      const memberIds = await this.assertMembersBelongToOrganization(
-        dto.memberUserIds,
-        organizationId,
-      );
-      await this.prisma.projectMember.deleteMany({ where: { projectId: id } });
-      await this.prisma.projectMember.createMany({
-        data: memberIds.map((userId) => ({
-          projectId: id,
-          userId,
-          role: 'MEMBER',
-        })),
+    return this.prisma.$transaction(async (tx) => {
+      const project = await tx.project.findFirst({
+        where: { id, organizationId },
+        select: { id: true },
       });
-    }
+      if (!project) throw new NotFoundException('پروژه یافت نشد.');
 
-    return this.prisma.project.update({
-      where: { id },
-      data: {
-        name: dto.name,
-        code: dto.code ? dto.code.toUpperCase() : undefined,
-        description: dto.description,
-        status: dto.status,
-      },
-      include: {
-        members: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                username: true,
-                firstName: true,
-                lastName: true,
+      // Keep membership replacement and project edits atomic so a failed
+      // member insert cannot leave the project with a partially updated team.
+      if (dto.memberUserIds !== undefined) {
+        const memberIds = [...new Set(dto.memberUserIds)];
+        const activeMemberships = await tx.organizationMember.count({
+          where: {
+            organizationId,
+            userId: { in: memberIds },
+            status: 'ACTIVE',
+          },
+        });
+        if (activeMemberships !== memberIds.length) {
+          throw new BadRequestException(
+            'همه اعضا باید عضو فعال همین سازمان باشند.',
+          );
+        }
+
+        await tx.projectMember.deleteMany({ where: { projectId: id } });
+        if (memberIds.length > 0) {
+          await tx.projectMember.createMany({
+            data: memberIds.map((userId) => ({
+              projectId: id,
+              userId,
+              role: 'MEMBER',
+            })),
+          });
+        }
+      }
+
+      return tx.project.update({
+        where: { id },
+        data: {
+          name: dto.name,
+          code: dto.code ? dto.code.toUpperCase() : undefined,
+          description: dto.description,
+          status: dto.status,
+        },
+        include: {
+          members: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  firstName: true,
+                  lastName: true,
+                },
               },
             },
           },
         },
-      },
+      });
     });
   }
 

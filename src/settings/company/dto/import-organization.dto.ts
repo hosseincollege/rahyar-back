@@ -2,6 +2,7 @@
 // این DTO ساختار داده‌های ورودی برای عملیات درون‌ریزی سازمان، شعب و دپارتمان‌ها را تعیین و اعتبارسنجی می‌کند.
 
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsEmail,
@@ -164,12 +165,14 @@ export class ImportOrganizationDto {
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(1000)
   @ValidateNested({ each: true })
   @Type(() => ImportBranchItemDto)
   branches?: ImportBranchItemDto[];
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(1000)
   @ValidateNested({ each: true })
   @Type(() => ImportDepartmentItemDto)
   departments?: ImportDepartmentItemDto[];

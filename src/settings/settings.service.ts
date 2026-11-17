@@ -403,6 +403,25 @@ export class SettingsService {
     private readonly logoStorage: OrganizationLogoStorageService,
   ) {}
 
+  private async serializableStructureWrite<T>(
+    operation: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await this.prisma.$transaction(operation, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2034'
+      )
+        throw new ConflictException(
+          'ساختار سازمانی هم‌زمان تغییر کرده است. فهرست را تازه‌سازی و دوباره تلاش کنید.',
+        );
+      throw error;
+    }
+  }
+
   /** آمار بازدیدکنندگان بر اساس روزهای تقویمی تهران و حضور در پنج دقیقه اخیر. */
   async getPublicStats() {
     if (!this.isVercelRuntime())
@@ -437,12 +456,12 @@ export class SettingsService {
     const onlineSince = new Date(now.getTime() - 5 * 60 * 1000);
 
     const countUniqueVisitorsSince = async (since: Date) => {
-      const visitors = await this.prisma.visit.findMany({
-        where: { createdAt: { gte: since } },
-        distinct: ['ipAddress'],
-        select: { ipAddress: true },
-      });
-      return visitors.length;
+      const [result] = await this.prisma.$queryRaw<Array<{ count: bigint }>>(
+        Prisma.sql`SELECT COUNT(DISTINCT "ipAddress") AS count
+          FROM "visits"
+          WHERE "createdAt" >= ${since}`,
+      );
+      return Number(result?.count ?? 0n);
     };
 
     const [daily, weekly, monthly, yearly, online] = await Promise.all([
@@ -1103,7 +1122,7 @@ export class SettingsService {
     }
     const grantablePermissionKeys = new Set(access.permissionKeys ?? []);
 
-    await this.prisma.$transaction(async (tx) => {
+    const saveRolesTransaction = this.prisma.$transaction(async (tx) => {
       const org = await tx.organization.findUnique({
         where: { id: organizationId },
         select: { id: true },
@@ -1347,6 +1366,16 @@ export class SettingsService {
         },
       });
     });
+    await saveRolesTransaction.catch((error: unknown) => {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      )
+        throw new ConflictException(
+          'کلید یا نام نقش هم‌زمان ثبت شده است. فهرست نقش‌ها را تازه‌سازی کنید.',
+        );
+      throw error;
+    });
     // The caller was authorized before the transaction. Read the committed
     // result with that authorization snapshot so removing their own role does
     // not turn a successful write into an apparent API failure.
@@ -1448,8 +1477,10 @@ export class SettingsService {
     users: unknown[],
     actor: AuthenticatedUser,
   ) {
-    if (!Array.isArray(users)) {
-      throw new BadRequestException('Invalid users payload.');
+    if (!Array.isArray(users) || users.length > 500) {
+      throw new BadRequestException(
+        'حداکثر ۵۰۰ حساب را در هر درخواست ذخیره یا درون‌ریزی کنید.',
+      );
     }
     const parsedUsers = users.map(parseSaveUserInput);
     const seenUserIds = new Set<string>();
@@ -1482,7 +1513,7 @@ export class SettingsService {
       throw new ForbiddenException('مجوز ویرایش کاربران این سازمان را ندارید.');
     }
 
-    await this.prisma.$transaction(async (tx) => {
+    const saveUsersTransaction = this.prisma.$transaction(async (tx) => {
       const org = await tx.organization.findUnique({
         where: { id: organizationId },
         select: { id: true, ownerId: true },
@@ -1501,6 +1532,7 @@ export class SettingsService {
         },
       });
 
+      let newUsersInRequest = 0;
       for (const item of parsedUsers) {
         const nationalId = normalizeNationalId(
           item.nationalId ?? item.nationalCode,
@@ -1566,6 +1598,11 @@ export class SettingsService {
           ? 'ACTIVE'
           : 'SUSPENDED';
         const isNewUser = !user;
+        if (isNewUser && ++newUsersInRequest > 50) {
+          throw new BadRequestException(
+            'در هر درخواست حداکثر ۵۰ حساب تازه بسازید.',
+          );
+        }
         const previousUser = user
           ? {
               username: user.username,
@@ -2016,6 +2053,16 @@ export class SettingsService {
         }
       }
     });
+    await saveUsersTransaction.catch((error: unknown) => {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      )
+        throw new ConflictException(
+          'ایمیل، نام کاربری یا کد پرسنلی هم‌زمان ثبت شده است. فهرست کاربران را تازه‌سازی کنید.',
+        );
+      throw error;
+    });
     // A write may change the actor's effective users.read/users.write grants.
     // Return the committed state under the authorization already checked above.
     return this.listUsers(organizationId);
@@ -2160,7 +2207,7 @@ export class SettingsService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.serializableStructureWrite(async (tx) => {
       if (dto.isMain) {
         await tx.branch.updateMany({
           where: { organizationId: dto.organizationId, isMain: true },
@@ -2206,7 +2253,7 @@ export class SettingsService {
       throw new ForbiddenException('مجوز مدیریت ساختار سازمانی را ندارید.');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.serializableStructureWrite(async (tx) => {
       if (dto.isMain === true) {
         await tx.branch.updateMany({
           where: {
@@ -2219,7 +2266,7 @@ export class SettingsService {
       }
 
       return tx.branch.update({
-        where: { id },
+        where: { id, organizationId: branch.organizationId },
         data: {
           ...(dto.name !== undefined && { name: dto.name }),
           ...(dto.code !== undefined && { code: dto.code }),
@@ -2265,10 +2312,12 @@ export class SettingsService {
         }
 
         await tx.department.updateMany({
-          where: { branchId: id },
+          where: { branchId: id, organizationId: branch.organizationId },
           data: { branchId: null },
         });
-        await tx.branch.delete({ where: { id } });
+        await tx.branch.delete({
+          where: { id, organizationId: branch.organizationId },
+        });
       });
     } catch (error) {
       if (
@@ -2378,7 +2427,7 @@ export class SettingsService {
 
     return this.prisma.$transaction(async (tx) => {
       const updatedDepartment = await tx.department.update({
-        where: { id },
+        where: { id, organizationId: department.organizationId },
         data: {
           ...(dto.name !== undefined && { name: dto.name }),
           ...(dto.code !== undefined && { code: dto.code }),
@@ -2430,7 +2479,9 @@ export class SettingsService {
             '\u0627\u06cc\u0646 \u062f\u067e\u0627\u0631\u062a\u0645\u0627\u0646 \u0628\u0647 \u06a9\u0627\u0631\u0645\u0646\u062f \u06cc\u0627 \u0633\u0646\u062f \u0645\u0627\u0644\u06cc \u0645\u062a\u0635\u0644 \u0627\u0633\u062a. \u0627\u0628\u062a\u062f\u0627 \u0627\u0631\u062a\u0628\u0627\u0637 \u06a9\u0627\u0631\u0645\u0646\u062f\u0627\u0646 \u0631\u0627 \u062d\u0630\u0641 \u06a9\u0646\u06cc\u062f \u0648 \u0628\u0631\u0627\u06cc \u0633\u0646\u062f\u0647\u0627\u06cc \u0645\u0627\u0644\u06cc \u0627\u0632 \u063a\u06cc\u0631\u0641\u0639\u0627\u0644\u200c\u06a9\u0631\u062f\u0646 \u062f\u067e\u0627\u0631\u062a\u0645\u0627\u0646 \u0627\u0633\u062a\u0641\u0627\u062f\u0647 \u06a9\u0646\u06cc\u062f.',
           );
         }
-        await tx.department.delete({ where: { id } });
+        await tx.department.delete({
+          where: { id, organizationId: department.organizationId },
+        });
       });
     } catch (error) {
       if (
@@ -2489,7 +2540,7 @@ export class SettingsService {
       departmentCodes.add(code);
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.serializableStructureWrite(async (tx) => {
       if (dto.organization) {
         await tx.organization.update({
           where: { id: organizationId },

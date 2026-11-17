@@ -22,12 +22,15 @@ import {
   ReplaceRahcomSolarSpecialSystemsDto,
   CreateRahcomTrafficSnapshotDto,
   ImportRahcomTicketsDto,
+  ImportRahcomSystemsBatchDto,
   ReplaceRahcomRoadListDto,
   DeleteRahcomSystemsBodyDto,
   DeleteRahcomSystemsQueryDto,
   ImportRahcomSystemsDto,
   RahcomActivitiesQueryDto,
   RahcomProvinceQueryDto,
+  RahcomSystemSearchQueryDto,
+  RahcomSystemLookupDto,
   RahcomTrafficSnapshotDatesQueryDto,
   UpdateRahcomSystemDto,
   UpdateRahcomMemberProvinceDto,
@@ -60,6 +63,20 @@ export class RahcomController {
   ) {
     return this.service.listSystems(user, query.province);
   }
+  @Get('systems/search')
+  searchSystems(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RahcomSystemSearchQueryDto,
+  ) {
+    return this.service.searchSystems(user, query.province, query.q);
+  }
+  @Post('systems/lookup')
+  lookupSystems(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: RahcomSystemLookupDto,
+  ) {
+    return this.service.lookupSystems(user, body);
+  }
   @Post('systems')
   createSystem(
     @CurrentUser() user: AuthenticatedUser,
@@ -71,6 +88,13 @@ export class RahcomController {
   importSystems(
     @CurrentUser() user: AuthenticatedUser,
     @Body() body: ImportRahcomSystemsDto,
+  ) {
+    return this.service.importSystems(user, body);
+  }
+  @Post('systems/import-batch')
+  importSystemsBatch(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: ImportRahcomSystemsBatchDto,
   ) {
     return this.service.importSystems(user, body);
   }
@@ -143,6 +167,18 @@ export class RahcomController {
     @Query() query: RahcomProvinceQueryDto,
   ) {
     return this.service.listImportedTickets(user, query.province, query.date);
+  }
+  @Get('tickets/dates')
+  listImportedTicketDates(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RahcomTrafficSnapshotDatesQueryDto,
+  ) {
+    return this.service.listImportedTicketDates(
+      user,
+      query.province,
+      query.from,
+      query.to,
+    );
   }
   @Post('tickets/import')
   importTickets(
@@ -225,6 +261,18 @@ export class RahcomController {
     @Query() query: RahcomProvinceQueryDto,
   ) {
     return this.service.listSolarSnapshots(user, query.province, query.date);
+  }
+  @Get('solar-snapshots/dates')
+  listSolarSnapshotDates(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RahcomTrafficSnapshotDatesQueryDto,
+  ) {
+    return this.service.listSolarSnapshotDates(
+      user,
+      query.province,
+      query.from,
+      query.to,
+    );
   }
   @Post('solar-snapshots')
   createSolarSnapshot(

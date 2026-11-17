@@ -12,6 +12,7 @@ import type {
   CreateRahcomActivityDto,
   CreateRahcomSystemDto,
   CreateRahcomSystemActivityDto,
+  ImportRahcomSystemsBatchDto,
   CreateRahcomSolarSnapshotDto,
   ReplaceRahcomSolarSpecialSystemsDto,
   CreateRahcomTrafficSnapshotDto,
@@ -22,6 +23,8 @@ import type {
   UpdateRahcomSystemDto,
   SaveRahcomDailyWorkflowDto,
   ReplaceRahcomBillIdentifierListDto,
+  RahcomSystemImportRowDto,
+  RahcomSystemLookupDto,
 } from './dto/rahcom.dto';
 import { isRahcomProvinceId, rahcomProvinceIdFromLabel } from './rahcom-axis';
 
@@ -75,6 +78,24 @@ export class RahcomService {
   private readonly demoSystemPrefix = 'DEMO-RAHCOM-';
   private readonly demoActivityPrefix = 'DEMO-RAHCOM |';
   constructor(private readonly prisma: PrismaService) {}
+  private async serializableTransaction<T>(
+    operation: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(operation, {
+          isolationLevel: 'Serializable',
+        });
+      } catch (error) {
+        if (
+          !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+          error.code !== 'P2034' ||
+          attempt >= 2
+        )
+          throw error;
+      }
+    }
+  }
   private organization(user: AuthenticatedUser) {
     if (!user.organizationId)
       throw new BadRequestException('No active organization is selected.');
@@ -222,11 +243,19 @@ export class RahcomService {
     const normalized = String(province ?? '').trim();
     if (normalized !== 'all' && !isRahcomProvinceId(normalized))
       throw new BadRequestException('Choose a supported province.');
-    return this.prisma.organizationMember.update({
-      where: { id: access.memberId },
+    const updated = await this.prisma.organizationMember.updateMany({
+      where: {
+        id: access.memberId,
+        organizationId: access.organizationId,
+        status: 'ACTIVE',
+      },
       data: { rahcomSelectedProvince: normalized },
-      select: { rahcomSelectedProvince: true },
     });
+    if (!updated.count)
+      throw new ConflictException(
+        'Your active organization membership changed. Refresh and try again.',
+      );
+    return { rahcomSelectedProvince: normalized };
   }
   private validDate(value: unknown) {
     if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value))
@@ -259,6 +288,91 @@ export class RahcomService {
         ...(selectedProvince ? { province: selectedProvince } : {}),
       },
       orderBy: [{ province: 'asc' }, { systemName: 'asc' }],
+    });
+  }
+  async searchSystems(
+    user: AuthenticatedUser,
+    requestedProvince: string | undefined,
+    requestedQuery: string,
+  ) {
+    const access = await this.authorize(user);
+    const province = this.scopedProvince(access, requestedProvince);
+    const query = String(requestedQuery ?? '').trim();
+    if (!query) return [];
+    const normalizedQuery = query
+      .normalize('NFKC')
+      .toLocaleLowerCase('fa')
+      .replace(/[\u06f0-\u06f9\u0660-\u0669]/g, (digit) => {
+        const code = digit.charCodeAt(0);
+        return String(code >= 0x06f0 ? code - 0x06f0 : code - 0x0660);
+      })
+      .replace(/[\u064a\u0649]/g, '\u06cc')
+      .replace(/\u0643/g, '\u06a9')
+      .replace(/[\u064b-\u065f\u0670\u200c\u200e\u200f]/g, '');
+    const queryVariants = [
+      ...new Set([
+        query,
+        normalizedQuery,
+        normalizedQuery
+          .replace(/\u06cc/g, '\u064a')
+          .replace(/\u06a9/g, '\u0643'),
+      ]),
+    ];
+    return this.prisma.rahcomSystem.findMany({
+      where: {
+        organizationId: access.organizationId,
+        ...(access.demoOnly
+          ? { systemCode: { startsWith: this.demoSystemPrefix } }
+          : {}),
+        ...(province ? { province } : {}),
+        OR: queryVariants.flatMap((variant) => [
+          { systemName: { contains: variant, mode: 'insensitive' } },
+          { systemCode: { contains: variant, mode: 'insensitive' } },
+        ]),
+      },
+      orderBy: [{ province: 'asc' }, { systemName: 'asc' }],
+      take: 8,
+    });
+  }
+  async lookupSystems(user: AuthenticatedUser, body: RahcomSystemLookupDto) {
+    const access = await this.authorize(user);
+    const province = this.scopedProvince(access, body.province);
+    if (!province || !isRahcomProvinceId(province))
+      throw new BadRequestException('Choose one supported province.');
+    const ids = [
+      ...new Set((body.ids ?? []).map((id) => id.trim()).filter(Boolean)),
+    ];
+    const codes = [
+      ...new Set((body.codes ?? []).map((code) => code.trim()).filter(Boolean)),
+    ];
+    if (ids.length + codes.length > 500)
+      throw new BadRequestException(
+        'Look up at most 500 saved system references at once.',
+      );
+    if (!ids.length && !codes.length) return [];
+    const references: Prisma.RahcomSystemWhereInput[] = [];
+    if (ids.length) references.push({ id: { in: ids } });
+    if (codes.length)
+      references.push({
+        systemCode: { in: codes, mode: 'insensitive' },
+      });
+    return this.prisma.rahcomSystem.findMany({
+      where: {
+        organizationId: access.organizationId,
+        province,
+        ...(access.demoOnly
+          ? { systemCode: { startsWith: this.demoSystemPrefix } }
+          : {}),
+        OR: references,
+      },
+      select: {
+        id: true,
+        systemName: true,
+        systemCode: true,
+        province: true,
+        announcedAxis: true,
+      },
+      orderBy: { systemName: 'asc' },
     });
   }
   async getBillIdentifiers(
@@ -356,44 +470,49 @@ export class RahcomService {
   ) {
     const access = await this.authorize(user);
     const province = this.scopedProvince(access, requestedProvince);
-    const provinceSystems = province
-      ? await this.prisma.rahcomSystem.findMany({
-          where: {
-            organizationId: access.organizationId,
-            province,
-            ...(access.demoOnly
-              ? { systemCode: { startsWith: this.demoSystemPrefix } }
-              : {}),
-          },
-          select: { systemCode: true },
-        })
-      : [];
-    const candidateCodes = [
-      ...new Set(provinceSystems.map(({ systemCode }) => systemCode)),
-    ];
-    const allMatchingSystems = candidateCodes.length
-      ? await this.prisma.rahcomSystem.findMany({
-          where: {
-            organizationId: access.organizationId,
-            systemCode: { in: candidateCodes },
-          },
-          select: { systemCode: true, province: true },
-        })
-      : [];
-    const provincesByCode = new Map<string, Set<string>>();
-    for (const system of allMatchingSystems) {
-      const provinces =
-        provincesByCode.get(system.systemCode) ?? new Set<string>();
-      provinces.add(system.province);
-      provincesByCode.set(system.systemCode, provinces);
+    const listDate = requestedDate ? this.validDate(requestedDate) : undefined;
+    let legacyCodes: string[] = [];
+    if (province) {
+      const legacyCodeGroups = await this.prisma.rahcomImportedTicket.groupBy({
+        by: ['systemCode'],
+        where: {
+          organizationId: access.organizationId,
+          province: null,
+          ...(listDate ? { listDate } : {}),
+          ...(access.demoOnly
+            ? { systemCode: { startsWith: this.demoSystemPrefix } }
+            : {}),
+        },
+      });
+      const candidateCodes = [
+        ...new Set(legacyCodeGroups.map(({ systemCode }) => systemCode)),
+      ];
+      const matchingSystems = candidateCodes.length
+        ? await this.prisma.rahcomSystem.findMany({
+            where: {
+              organizationId: access.organizationId,
+              systemCode: { in: candidateCodes },
+            },
+            select: { systemCode: true, province: true },
+          })
+        : [];
+      const provincesByCode = new Map<string, Set<string>>();
+      for (const system of matchingSystems) {
+        const provinces =
+          provincesByCode.get(system.systemCode) ?? new Set<string>();
+        provinces.add(system.province);
+        provincesByCode.set(system.systemCode, provinces);
+      }
+      legacyCodes = candidateCodes.filter(
+        (code) =>
+          provincesByCode.get(code)?.size === 1 &&
+          provincesByCode.get(code)?.has(province),
+      );
     }
-    const legacyCodes = candidateCodes.filter(
-      (code) => provincesByCode.get(code)?.size === 1,
-    );
-    return this.prisma.rahcomImportedTicket.findMany({
+    const tickets = await this.prisma.rahcomImportedTicket.findMany({
       where: {
         organizationId: access.organizationId,
-        ...(requestedDate ? { listDate: this.validDate(requestedDate) } : {}),
+        ...(listDate ? { listDate } : {}),
         ...(access.demoOnly
           ? { systemCode: { startsWith: this.demoSystemPrefix } }
           : {}),
@@ -410,6 +529,118 @@ export class RahcomService {
       },
       orderBy: [{ importedAt: 'desc' }, { ticketCode: 'asc' }],
     });
+    const ticketCodes = [
+      ...new Set(
+        tickets.map(({ systemCode }) => systemCode.trim()).filter(Boolean),
+      ),
+    ];
+    const relatedSystems = ticketCodes.length
+      ? await this.prisma.rahcomSystem.findMany({
+          where: {
+            organizationId: access.organizationId,
+            systemCode: {
+              in: ticketCodes,
+              mode: 'insensitive',
+              ...(access.demoOnly ? { startsWith: this.demoSystemPrefix } : {}),
+            },
+            ...(province ? { province } : {}),
+          },
+        })
+      : [];
+    const systemsByCode = new Map<string, typeof relatedSystems>();
+    for (const system of relatedSystems) {
+      const key = system.systemCode.trim().toUpperCase();
+      systemsByCode.set(key, [...(systemsByCode.get(key) ?? []), system]);
+    }
+    return tickets.map((ticket) => {
+      const candidates =
+        systemsByCode.get(ticket.systemCode.trim().toUpperCase()) ?? [];
+      const targetProvince = ticket.province ?? province;
+      const system = targetProvince
+        ? candidates.find((candidate) => candidate.province === targetProvince)
+        : candidates.length === 1
+          ? candidates[0]
+          : null;
+      return { ...ticket, system: system ?? null };
+    });
+  }
+  async listImportedTicketDates(
+    user: AuthenticatedUser,
+    requestedProvince: string | undefined,
+    fromValue: string,
+    toValue: string,
+  ) {
+    const access = await this.authorize(user);
+    const province = this.scopedProvince(access, requestedProvince);
+    const from = this.validDate(fromValue);
+    const to = this.validDate(toValue);
+    if (from > to) throw new BadRequestException('The date range is invalid.');
+    if (to.getTime() - from.getTime() > 62 * 86_400_000)
+      throw new BadRequestException(
+        'Choose a date range of no more than 62 days.',
+      );
+    const where = {
+      organizationId: access.organizationId,
+      listDate: { gte: from, lte: to },
+      ...(access.demoOnly
+        ? { systemCode: { startsWith: this.demoSystemPrefix } }
+        : {}),
+    };
+    if (!province) {
+      const dates = await this.prisma.rahcomImportedTicket.groupBy({
+        by: ['listDate'],
+        where,
+        orderBy: { listDate: 'asc' },
+      });
+      return dates.map(({ listDate }) => listDate.toISOString().slice(0, 10));
+    }
+
+    const [directDates, legacyTickets] = await Promise.all([
+      this.prisma.rahcomImportedTicket.groupBy({
+        by: ['listDate'],
+        where: { ...where, province },
+        orderBy: { listDate: 'asc' },
+      }),
+      this.prisma.rahcomImportedTicket.groupBy({
+        by: ['listDate', 'systemCode'],
+        where: { ...where, province: null },
+      }),
+    ]);
+    const legacyCodes = [
+      ...new Set(
+        legacyTickets
+          .map(({ systemCode }) => systemCode.trim())
+          .filter(Boolean),
+      ),
+    ];
+    const legacySystems = legacyCodes.length
+      ? await this.prisma.rahcomSystem.findMany({
+          where: {
+            organizationId: access.organizationId,
+            systemCode: {
+              in: legacyCodes,
+              ...(access.demoOnly ? { startsWith: this.demoSystemPrefix } : {}),
+            },
+          },
+          select: { systemCode: true, province: true },
+        })
+      : [];
+    const provincesByCode = new Map<string, Set<string>>();
+    for (const system of legacySystems) {
+      const code = system.systemCode;
+      const provinces = provincesByCode.get(code) ?? new Set<string>();
+      provinces.add(system.province);
+      provincesByCode.set(code, provinces);
+    }
+    const dateKeys = new Set(
+      directDates.map(({ listDate }) => listDate.toISOString().slice(0, 10)),
+    );
+    for (const ticket of legacyTickets) {
+      const matchingProvinces = provincesByCode.get(ticket.systemCode.trim());
+      if (matchingProvinces?.size === 1 && matchingProvinces.has(province))
+        dateKeys.add(ticket.listDate.toISOString().slice(0, 10));
+    }
+    return [...dateKeys].sort();
   }
   async updateImportedTicketDescription(
     user: AuthenticatedUser,
@@ -458,7 +689,7 @@ export class RahcomService {
     const requestedCodes = [
       ...new Set(
         body.tickets
-          .map((row) => row.systemCode?.trim())
+          .map((row) => row.systemCode?.trim().toUpperCase())
           .filter((code): code is string => Boolean(code)),
       ),
     ];
@@ -466,7 +697,7 @@ export class RahcomService {
       ? await this.prisma.rahcomSystem.findMany({
           where: {
             organizationId: access.organizationId,
-            systemCode: { in: requestedCodes },
+            systemCode: { in: requestedCodes, mode: 'insensitive' },
           },
           select: { systemCode: true, province: true },
         })
@@ -474,9 +705,10 @@ export class RahcomService {
     const provincesByCode = new Map<string, Set<string>>();
     for (const system of systems) {
       const provinces =
-        provincesByCode.get(system.systemCode) ?? new Set<string>();
+        provincesByCode.get(system.systemCode.toUpperCase()) ??
+        new Set<string>();
       provinces.add(system.province);
-      provincesByCode.set(system.systemCode, provinces);
+      provincesByCode.set(system.systemCode.toUpperCase(), provinces);
     }
     for (const row of body.tickets) {
       const requestedProvince = province;
@@ -493,7 +725,7 @@ export class RahcomService {
           'You can only import tickets for your assigned province.',
         );
       }
-      const systemCode = row.systemCode?.trim() ?? '';
+      const systemCode = row.systemCode?.trim().toUpperCase() ?? '';
       const knownProvinces = provincesByCode.get(systemCode);
       if (
         knownProvinces?.size &&
@@ -532,13 +764,13 @@ export class RahcomService {
     const rows = body.tickets.map((row) => ({
       organizationId: access.organizationId,
       ticketCode: row.ticketCode.trim(),
-      systemCode: row.systemCode?.trim() ?? '',
+      systemCode: row.systemCode?.trim().toUpperCase() ?? '',
       province,
       listDate,
       summary: row.summary?.trim() ?? '',
       description:
-        row.description?.trim() ??
-        descriptionsByTicket.get(row.ticketCode.trim()) ??
+        row.description?.trim() ||
+        descriptionsByTicket.get(row.ticketCode.trim()) ||
         '',
       customer: row.customer?.trim() ?? '',
       equipment: row.equipment?.trim() ?? '',
@@ -772,11 +1004,19 @@ export class RahcomService {
     });
     if (!member)
       throw new NotFoundException('Active organization member not found.');
-    return this.prisma.organizationMember.update({
-      where: { id: member.id },
+    const updated = await this.prisma.organizationMember.updateMany({
+      where: {
+        id: member.id,
+        organizationId: access.organizationId,
+        status: 'ACTIVE',
+      },
       data: { rahcomProvince: normalized },
-      select: { id: true, rahcomProvince: true },
     });
+    if (!updated.count)
+      throw new ConflictException(
+        'The active organization membership changed. Refresh and try again.',
+      );
+    return { id: member.id, rahcomProvince: normalized };
   }
   async listSolarSnapshots(
     user: AuthenticatedUser,
@@ -798,6 +1038,42 @@ export class RahcomService {
       orderBy: { capturedAt: 'desc' },
       take: 100,
     });
+  }
+  async listSolarSnapshotDates(
+    user: AuthenticatedUser,
+    requestedProvince: string | undefined,
+    fromValue: string,
+    toValue: string,
+  ) {
+    const access = await this.authorize(user);
+    const province = this.scopedProvince(access, requestedProvince);
+    const from = this.tehranDateRange(fromValue).gte;
+    const to = this.tehranDateRange(toValue).lt;
+    if (from > to || to.getTime() - from.getTime() > 62 * 24 * 60 * 60 * 1000) {
+      throw new BadRequestException(
+        'Choose a valid date range of no more than 62 days.',
+      );
+    }
+    const provinceFilter = province
+      ? Prisma.sql`AND province = ${province}`
+      : Prisma.empty;
+    const creatorFilter = access.demoOnly
+      ? Prisma.sql`AND "createdById" = ${user.id}`
+      : Prisma.empty;
+    const rows = await this.prisma.$queryRaw<
+      Array<{ dateKey: string }>
+    >(Prisma.sql`
+      SELECT to_char(("capturedAt" AT TIME ZONE 'Asia/Tehran')::date, 'YYYY-MM-DD') AS "dateKey"
+      FROM "rahcom_solar_snapshots"
+      WHERE "organizationId" = ${access.organizationId}
+        AND "capturedAt" >= ${from}
+        AND "capturedAt" < ${to}
+        ${provinceFilter}
+        ${creatorFilter}
+      GROUP BY 1
+      ORDER BY 1
+    `);
+    return rows.map(({ dateKey }) => dateKey);
   }
   async createSolarSnapshot(
     user: AuthenticatedUser,
@@ -1513,57 +1789,61 @@ export class RahcomService {
       assignments.set(assignmentKey, assignment);
     }
 
-    const mutations = [...assignments.values()].map(
-      ({ province, name, axisCode, codes }) =>
-        this.prisma.rahcomSystem.updateMany({
-          where: {
-            organizationId,
-            province,
-            ...(demoOnly
-              ? {
-                  systemCode: {
-                    startsWith: this.demoSystemPrefix,
-                    in: [...codes],
-                  },
-                }
-              : { systemCode: { in: [...codes] } }),
-          },
-          data: { announcedAxis: name, axisCode },
-        }),
-    );
-    const results = await this.prisma.$transaction(mutations, {
-      maxWait: 10_000,
-      timeout: 30_000,
-    });
-    const updatedSystems = results.reduce(
-      (total, result) => total + ('count' in result ? result.count : 0),
-      0,
-    );
-    if (staticMetadataByKey.size) {
-      const metadataRows = [...staticMetadataByKey.values()];
-      const demoConstraint = demoOnly
-        ? Prisma.sql`AND system."systemCode" LIKE ${`${this.demoSystemPrefix}%`}`
-        : Prisma.empty;
-      for (let offset = 0; offset < metadataRows.length; offset += 500) {
-        const batch = metadataRows.slice(offset, offset + 500);
-        const values = Prisma.join(
-          batch.map(
-            (row) =>
-              Prisma.sql`(${row.province}, ${row.systemCode}, ${row.stationName}, ${row.aggregationCode})`,
+    const updatedSystems = await this.prisma.$transaction(
+      async (tx) => {
+        const results = await Promise.all(
+          [...assignments.values()].map(({ province, name, axisCode, codes }) =>
+            tx.rahcomSystem.updateMany({
+              where: {
+                organizationId,
+                province,
+                ...(demoOnly
+                  ? {
+                      systemCode: {
+                        startsWith: this.demoSystemPrefix,
+                        in: [...codes],
+                        mode: 'insensitive',
+                      },
+                    }
+                  : { systemCode: { in: [...codes], mode: 'insensitive' } }),
+              },
+              data: { announcedAxis: name, axisCode },
+            }),
           ),
         );
-        await this.prisma.$executeRaw(Prisma.sql`
-          UPDATE "rahcom_systems" AS system
-          SET "station_name" = CASE WHEN ${stationNameIndex >= 0} THEN input.station_name ELSE system."station_name" END,
-              "aggregation_code" = CASE WHEN ${aggregationCodeIndex >= 0} THEN input.aggregation_code ELSE system."aggregation_code" END
-          FROM (VALUES ${values}) AS input(province, system_code, station_name, aggregation_code)
-          WHERE system."organizationId" = ${organizationId}
-            AND system."province" = input.province
-            AND UPPER(system."systemCode") = UPPER(input.system_code)
-            ${demoConstraint}
-        `);
-      }
-    }
+        const count = results.reduce(
+          (total, result) => total + result.count,
+          0,
+        );
+        if (staticMetadataByKey.size) {
+          const metadataRows = [...staticMetadataByKey.values()];
+          const demoConstraint = demoOnly
+            ? Prisma.sql`AND system."systemCode" LIKE ${`${this.demoSystemPrefix}%`}`
+            : Prisma.empty;
+          for (let offset = 0; offset < metadataRows.length; offset += 500) {
+            const batch = metadataRows.slice(offset, offset + 500);
+            const values = Prisma.join(
+              batch.map(
+                (row) =>
+                  Prisma.sql`(${row.province}, ${row.systemCode}, ${row.stationName}, ${row.aggregationCode})`,
+              ),
+            );
+            await tx.$executeRaw(Prisma.sql`
+              UPDATE "rahcom_systems" AS system
+              SET "station_name" = CASE WHEN ${stationNameIndex >= 0} THEN input.station_name ELSE system."station_name" END,
+                  "aggregation_code" = CASE WHEN ${aggregationCodeIndex >= 0} THEN input.aggregation_code ELSE system."aggregation_code" END
+              FROM (VALUES ${values}) AS input(province, system_code, station_name, aggregation_code)
+              WHERE system."organizationId" = ${organizationId}
+                AND system."province" = input.province
+                AND UPPER(system."systemCode") = UPPER(input.system_code)
+                ${demoConstraint}
+            `);
+          }
+        }
+        return count;
+      },
+      { maxWait: 10_000, timeout: 30_000 },
+    );
     return {
       updatedSystems,
       unmatchedSystems: Math.max(0, listedSystems.size - updatedSystems),
@@ -1576,7 +1856,9 @@ export class RahcomService {
     const province =
       this.scopedProvince(access, String(body?.province ?? '').trim()) ?? '';
     const systemName = String(body?.systemName ?? '').trim();
-    const systemCode = String(body?.systemCode ?? '').trim();
+    const systemCode = String(body?.systemCode ?? '')
+      .trim()
+      .toUpperCase();
     const axisCode = String(body?.axisCode ?? '').trim();
     const announcedAxis = String(body?.announcedAxis ?? '').trim();
     const hasLatitude = body?.latitude !== undefined;
@@ -1603,42 +1885,64 @@ export class RahcomService {
         'Demo accounts can only create demo Rahcom systems.',
       );
     const existing = await this.prisma.rahcomSystem.findFirst({
-      where: { organizationId, province, systemCode },
+      where: {
+        organizationId,
+        province,
+        systemCode: { equals: systemCode, mode: 'insensitive' },
+      },
       select: { id: true },
     });
     if (existing)
       throw new ConflictException(
         'A system with this code already exists in the selected province.',
       );
-    return this.prisma.rahcomSystem.create({
-      data: {
-        organizationId,
-        province,
-        systemName,
-        systemCode,
-        axisCode,
-        announcedAxis,
-        latitude,
-        longitude,
-        electricityBillId: this.optionalText(body.electricityBillId, 120),
-      },
-    });
+    try {
+      return await this.prisma.rahcomSystem.create({
+        data: {
+          organizationId,
+          province,
+          systemName,
+          systemCode,
+          axisCode,
+          announcedAxis,
+          latitude,
+          longitude,
+          electricityBillId: this.optionalText(body.electricityBillId, 120),
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      )
+        throw new ConflictException(
+          'A system with this code already exists in the selected province.',
+        );
+      throw error;
+    }
   }
-  async importSystems(user: AuthenticatedUser, body: ImportRahcomSystemsDto) {
+  async importSystems(
+    user: AuthenticatedUser,
+    body: ImportRahcomSystemsDto | ImportRahcomSystemsBatchDto,
+  ) {
     const access = await this.authorize(user, true);
     const { organizationId, demoOnly } = access;
-    const province =
-      this.scopedProvince(access, String(body?.province ?? '').trim()) ?? '';
+    const hasOneProvince = 'province' in body;
+    const requestedProvince = hasOneProvince
+      ? this.scopedProvince(access, String(body.province ?? '').trim())
+      : undefined;
+    const inputSystems: Array<
+      RahcomSystemImportRowDto & { province?: string }
+    > = body.systems;
     if (
-      !province ||
-      province.length > 80 ||
-      !Array.isArray(body?.systems) ||
-      body.systems.length > 10000
+      (hasOneProvince && !requestedProvince) ||
+      !Array.isArray(inputSystems) ||
+      inputSystems.length > 10000
     )
       throw new BadRequestException(
-        'Select a province and provide at most 10,000 rows.',
+        'Select valid provinces and provide at most 10,000 rows.',
       );
-    const rows = body.systems.map(
+    const rows = inputSystems.map(
       (
         raw,
         index,
@@ -1668,8 +1972,17 @@ export class RahcomService {
         longOutageDetails?: string | null;
       } => {
         const row = raw;
+        const province = hasOneProvince
+          ? requestedProvince
+          : this.scopedProvince(access, String(row.province ?? '').trim());
+        if (!province || province.length > 80)
+          throw new BadRequestException(
+            `Select a valid province for system row ${index + 1}.`,
+          );
         const systemName = String(row.systemName ?? '').trim();
-        const systemCode = String(row.systemCode ?? '').trim();
+        const systemCode = String(row.systemCode ?? '')
+          .trim()
+          .toUpperCase();
         const hasLatitude = row.latitude !== undefined && row.latitude !== null;
         const hasLongitude =
           row.longitude !== undefined && row.longitude !== null;
@@ -1769,62 +2082,81 @@ export class RahcomService {
     );
     const codes = new Set<string>();
     for (const row of rows) {
-      if (codes.has(row.systemCode))
+      const normalizedCode = `${row.province}\u0000${row.systemCode.toUpperCase()}`;
+      if (codes.has(normalizedCode))
         throw new BadRequestException(
           `Duplicate system code: ${row.systemCode}`,
         );
-      codes.add(row.systemCode);
+      codes.add(normalizedCode);
     }
-    await this.prisma.$transaction(
-      rows.map((row) => {
-        const {
-          details,
-          stationName,
-          aggregationCode,
-          axisCode,
-          announcedAxis,
-          longOutage,
-          longOutageReason,
-          longOutageDetails,
-          electricityBillId,
-          simIp,
-          radarIp,
-          cameraIp,
-          pcIp,
-          routerIp,
-          laptopIp,
-          incidentType,
-          incidentDetails,
-          ...required
-        } = row;
-        const optionalData = {
-          details,
-          stationName,
-          aggregationCode,
-          axisCode,
-          announcedAxis,
-          longOutage,
-          longOutageReason,
-          longOutageDetails,
-          electricityBillId,
-          simIp,
-          radarIp,
-          cameraIp,
-          pcIp,
-          routerIp,
-          laptopIp,
-          incidentType,
-          incidentDetails,
-        };
-        return this.prisma.rahcomSystem.upsert({
-          where: {
-            organizationId_province_systemCode: {
-              organizationId,
-              province,
-              systemCode: row.systemCode,
-            },
-          },
-          update: {
+    const existingSystems = await this.prisma.rahcomSystem.findMany({
+      where: {
+        organizationId,
+        province: { in: [...new Set(rows.map((row) => row.province))] },
+        systemCode: {
+          in: rows.map((row) => row.systemCode),
+          mode: 'insensitive',
+        },
+      },
+      select: { id: true, systemCode: true, province: true },
+    });
+    const existingByCode = new Map<string, (typeof existingSystems)[number]>();
+    for (const system of existingSystems) {
+      const normalizedCode = `${system.province}\u0000${system.systemCode.toUpperCase()}`;
+      if (existingByCode.has(normalizedCode)) {
+        throw new ConflictException(
+          `Multiple existing systems use code ${system.systemCode} with different casing in ${system.province}. Resolve those duplicate records before importing.`,
+        );
+      }
+      existingByCode.set(normalizedCode, system);
+    }
+    const systemWrites = rows.map((row) => {
+      const {
+        details,
+        stationName,
+        aggregationCode,
+        axisCode,
+        announcedAxis,
+        longOutage,
+        longOutageReason,
+        longOutageDetails,
+        electricityBillId,
+        simIp,
+        radarIp,
+        cameraIp,
+        pcIp,
+        routerIp,
+        laptopIp,
+        incidentType,
+        incidentDetails,
+        ...required
+      } = row;
+      const optionalData = {
+        details,
+        stationName,
+        aggregationCode,
+        axisCode,
+        announcedAxis,
+        longOutage,
+        longOutageReason,
+        longOutageDetails,
+        electricityBillId,
+        simIp,
+        radarIp,
+        cameraIp,
+        pcIp,
+        routerIp,
+        laptopIp,
+        incidentType,
+        incidentDetails,
+      };
+      const existing = existingByCode.get(
+        `${row.province}\u0000${row.systemCode.toUpperCase()}`,
+      );
+      if (existing) {
+        return this.prisma.rahcomSystem.update({
+          where: { id: existing.id },
+          data: {
             ...required,
             ...Object.fromEntries(
               Object.entries(optionalData).filter(
@@ -1832,29 +2164,59 @@ export class RahcomService {
               ),
             ),
           },
-          create: {
-            ...required,
-            details: details ?? null,
-            stationName: stationName ?? null,
-            aggregationCode: aggregationCode ?? null,
-            axisCode: axisCode ?? null,
-            announcedAxis: announcedAxis ?? null,
-            longOutage: longOutage ?? Boolean(longOutageReason),
-            longOutageReason: longOutageReason ?? null,
-            longOutageDetails: longOutageDetails ?? null,
-            electricityBillId: electricityBillId ?? null,
-            simIp: simIp ?? null,
-            radarIp: radarIp ?? null,
-            cameraIp: cameraIp ?? null,
-            pcIp: pcIp ?? null,
-            routerIp: routerIp ?? null,
-            laptopIp: laptopIp ?? null,
-            incidentType: incidentType ?? null,
-            incidentDetails: incidentDetails ?? null,
-          },
         });
-      }),
-    );
+      }
+      return this.prisma.rahcomSystem.upsert({
+        where: {
+          organizationId_province_systemCode: {
+            organizationId,
+            province: row.province,
+            systemCode: row.systemCode,
+          },
+        },
+        update: {
+          ...required,
+          ...Object.fromEntries(
+            Object.entries(optionalData).filter(
+              ([, value]) => value !== undefined,
+            ),
+          ),
+        },
+        create: {
+          ...required,
+          details: details ?? null,
+          stationName: stationName ?? null,
+          aggregationCode: aggregationCode ?? null,
+          axisCode: axisCode ?? null,
+          announcedAxis: announcedAxis ?? null,
+          longOutage: longOutage ?? Boolean(longOutageReason),
+          longOutageReason: longOutageReason ?? null,
+          longOutageDetails: longOutageDetails ?? null,
+          electricityBillId: electricityBillId ?? null,
+          simIp: simIp ?? null,
+          radarIp: radarIp ?? null,
+          cameraIp: cameraIp ?? null,
+          pcIp: pcIp ?? null,
+          routerIp: routerIp ?? null,
+          laptopIp: laptopIp ?? null,
+          incidentType: incidentType ?? null,
+          incidentDetails: incidentDetails ?? null,
+        },
+      });
+    });
+    try {
+      await this.prisma.$transaction(systemWrites);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'A system with this code already exists in the selected province.',
+        );
+      }
+      throw error;
+    }
     return { imported: rows.length };
   }
   async updateSystem(
@@ -1885,8 +2247,10 @@ export class RahcomService {
         : String(body.systemName ?? '').trim();
     const systemCode =
       body.systemCode === undefined
-        ? existing.systemCode
-        : String(body.systemCode ?? '').trim();
+        ? existing.systemCode.toUpperCase()
+        : String(body.systemCode ?? '')
+            .trim()
+            .toUpperCase();
     const latitude =
       body.latitude === undefined
         ? existing.latitude
@@ -1920,7 +2284,7 @@ export class RahcomService {
         where: {
           organizationId,
           province: existing.province,
-          systemCode,
+          systemCode: { equals: systemCode, mode: 'insensitive' },
           id: { not: existing.id },
         },
         select: { id: true },
@@ -2259,7 +2623,7 @@ export class RahcomService {
           : null,
       ],
     ];
-    await this.prisma.$transaction(async (tx) => {
+    await this.serializableTransaction(async (tx) => {
       if (actionSystemIds.size || referencedCodes.length) {
         const systems = await tx.rahcomSystem.findMany({
           where: {
@@ -2490,6 +2854,7 @@ export class RahcomService {
       },
     });
     if (!activity) throw new NotFoundException('Activity not found.');
+    let assignedProvince: string | null = null;
     if (!access.isAdmin) {
       if (activity.createdById !== user.id)
         throw new ForbiddenException(
@@ -2498,12 +2863,25 @@ export class RahcomService {
       const province = activity.system?.province ?? activity.provinceSnapshot;
       if (!province)
         throw new ForbiddenException('This activity has no assigned province.');
-      this.scopedProvince(access, province);
+      assignedProvince = this.scopedProvince(access, province) ?? null;
     }
     const result = await this.prisma.rahcomActivity.deleteMany({
       where: {
         id,
         organizationId,
+        ...(!access.isAdmin
+          ? {
+              createdById: user.id,
+              OR: [
+                ...(activity.systemId && assignedProvince
+                  ? [{ system: { province: assignedProvince } }]
+                  : []),
+                ...(!activity.systemId && assignedProvince
+                  ? [{ provinceSnapshot: assignedProvince }]
+                  : []),
+              ],
+            }
+          : {}),
         ...(demoOnly
           ? { description: { startsWith: this.demoActivityPrefix } }
           : {}),
