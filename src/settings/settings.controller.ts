@@ -40,6 +40,7 @@ import { UpdateDepartmentDto } from './organization/dto/update-department.dto';
 
 import { ImportOrganizationDto } from './company/dto/import-organization.dto';
 import { SaveRoleDto } from './roles/dto/save-role.dto';
+import { PublicPresenceDto } from './dto/public-presence.dto';
 
 @Controller('settings')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -69,7 +70,8 @@ export class SettingsController {
   @Public()
   @Post('public-track')
   async trackPublicVisit(@Req() req: Request) {
-    const forwarded = req.headers['x-vercel-forwarded-for'] || req.headers['x-forwarded-for'];
+    const forwarded =
+      req.headers['x-vercel-forwarded-for'] || req.headers['x-forwarded-for'];
     const ip =
       (typeof forwarded === 'string' ? forwarded.split(',')[0] : null) ||
       req.socket.remoteAddress ||
@@ -82,19 +84,18 @@ export class SettingsController {
   @Public()
   @Post('public-presence')
   async trackPublicPresence(
-    @Body() body: { visitorId?: string; sessionId?: string; pageViewId?: string; path?: string; event?: 'ENTER' | 'HEARTBEAT' | 'EXIT' },
+    @Body() body: PublicPresenceDto,
     @Req() req: Request,
   ) {
-    if (!body.visitorId) {
-      throw new BadRequestException('شناسه بازدیدکننده الزامی است.');
-    }
-    if (body.path && (!body.path.startsWith('/') || body.path.length > 500)) throw new BadRequestException('مسیر صفحه معتبر نیست.');
-    if (body.event && !['ENTER', 'HEARTBEAT', 'EXIT'].includes(body.event)) throw new BadRequestException('نوع رویداد معتبر نیست.');
-    const forwarded = req.headers['x-vercel-forwarded-for'] || req.headers['x-forwarded-for'];
-    const ip = (typeof forwarded === 'string' ? forwarded.split(',')[0] : null) || req.socket.remoteAddress || 'unknown';
+    const forwarded =
+      req.headers['x-vercel-forwarded-for'] || req.headers['x-forwarded-for'];
+    const ip =
+      (typeof forwarded === 'string' ? forwarded.split(',')[0] : null) ||
+      req.socket.remoteAddress ||
+      'unknown';
     return this.settingsService.trackVisitorPresence(
       body.visitorId,
-      (req.headers['user-agent'] as string) || undefined,
+      req.headers['user-agent'] || undefined,
       ip.trim(),
       body,
     );
@@ -142,13 +143,24 @@ export class SettingsController {
   }
 
   @Get('organization/:id/shell-visibility')
-  async getShellVisibility(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+  async getShellVisibility(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     return this.settingsService.getShellVisibility(id.trim(), user);
   }
 
   @Put('organization/:id/shell-visibility')
-  async updateShellVisibility(@Param('id') id: string, @Body() dto: UpdateShellVisibilityDto, @CurrentUser() user: AuthenticatedUser) {
-    return this.settingsService.updateShellVisibility(id.trim(), dto.shellVisibility ?? {}, user);
+  async updateShellVisibility(
+    @Param('id') id: string,
+    @Body() dto: UpdateShellVisibilityDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.settingsService.updateShellVisibility(
+      id.trim(),
+      dto.shellVisibility ?? {},
+      user,
+    );
   }
 
   @Put('organization/:id/appearance')
@@ -262,7 +274,9 @@ export class SettingsController {
         ? roles.roles
         : undefined;
     if (!Array.isArray(payload)) {
-      throw new BadRequestException('ÙØ±Ù…Øª ÙÙ‡Ø±Ø³Øª Ù†Ù‚Ø´â€ŒÙ‡Ø§ Ù†Ø§Ù…Ø¹ØªØ¨Ø± Ø§Ø³Øª.');
+      throw new BadRequestException(
+        '\u0641\u0631\u0645\u062a \u0641\u0647\u0631\u0633\u062a \u0646\u0642\u0634\u200c\u0647\u0627 \u0646\u0627\u0645\u0639\u062a\u0628\u0631 \u0627\u0633\u062a.',
+      );
     }
     return this.settingsService.saveRoles(organizationId.trim(), payload, user);
   }
@@ -425,5 +439,4 @@ export class SettingsController {
       user,
     );
   }
-
 }

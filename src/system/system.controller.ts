@@ -20,6 +20,9 @@ export class SystemController {
     @CurrentUser() user: AuthenticatedUser,
     @Query('limit') limit?: string,
   ) {
-    return this.systemService.getRecentActivity(user, limit ? Number(limit) : 5);
+    return this.systemService.getRecentActivity(
+      user,
+      limit ? Number(limit) : 5,
+    );
   }
 }

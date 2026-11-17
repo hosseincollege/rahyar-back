@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+} from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -13,12 +22,18 @@ export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
   @Post()
-  create(@Body() createProjectDto: CreateProjectDto, @CurrentUser() user: AuthenticatedUser) {
+  create(
+    @Body() createProjectDto: CreateProjectDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     return this.projectsService.create(createProjectDto, user);
   }
 
   @Post('import')
-  import(@Body() dto: ImportProjectsDto, @CurrentUser() user: AuthenticatedUser) {
+  import(
+    @Body() dto: ImportProjectsDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     return this.projectsService.import(dto.projects, user);
   }
 
@@ -33,7 +48,11 @@ export class ProjectsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateProjectDto: UpdateProjectDto, @CurrentUser() user: AuthenticatedUser) {
+  update(
+    @Param('id') id: string,
+    @Body() updateProjectDto: UpdateProjectDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     return this.projectsService.update(id, updateProjectDto, user);
   }
 

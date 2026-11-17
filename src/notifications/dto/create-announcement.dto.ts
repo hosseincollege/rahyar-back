@@ -9,7 +9,16 @@ import {
 } from 'class-validator';
 
 const supportedLocales = [
-  'fa', 'en', 'ar', 'zh-CN', 'fr', 'es', 'de', 'ru', 'ja', 'pt-BR',
+  'fa',
+  'en',
+  'ar',
+  'zh-CN',
+  'fr',
+  'es',
+  'de',
+  'ru',
+  'ja',
+  'pt-BR',
 ];
 
 export class CreateAnnouncementDto {
@@ -54,7 +63,10 @@ export class UpdateAnnouncementDto extends CreateAnnouncementDto {}
 
 export class CreateAnnouncementCommentDto {
   @IsString() @MinLength(1) @MaxLength(2000) body!: string;
-  @IsOptional() @IsArray() @IsString({ each: true }) mentionedUserIds?: string[];
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  mentionedUserIds?: string[];
 }
 
 export class AnnouncementReactionDto {

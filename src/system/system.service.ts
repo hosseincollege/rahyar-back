@@ -19,7 +19,10 @@ export class SystemService {
 
   async getStatus() {
     const checkedAt = new Date().toISOString();
-    const api = { status: 'online' as const, uptimeSeconds: Math.floor(process.uptime()) };
+    const api = {
+      status: 'online' as const,
+      uptimeSeconds: Math.floor(process.uptime()),
+    };
     const startedAt = performance.now();
 
     try {
@@ -71,7 +74,10 @@ export class SystemService {
       user: entry.user
         ? {
             id: entry.user.id,
-            name: [entry.user.firstName, entry.user.lastName].filter(Boolean).join(' ') || entry.user.username,
+            name:
+              [entry.user.firstName, entry.user.lastName]
+                .filter(Boolean)
+                .join(' ') || entry.user.username,
           }
         : null,
     }));

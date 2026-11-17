@@ -1,11 +1,6 @@
 // File: backend/src/settings/dto/save-role.dto.ts
 
-
-import {
-  IsArray,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+import { IsArray, IsOptional, IsString } from 'class-validator';
 
 export class SaveRoleDto {
   @IsOptional()

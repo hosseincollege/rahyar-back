@@ -1,11 +1,6 @@
 // File: src/core/auth/dto/bootstrap.dto.ts
 
-import {
-  IsEmail,
-  IsNotEmpty,
-  IsString,
-  MinLength,
-} from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 
 /**
  * Rahyar backend documentation

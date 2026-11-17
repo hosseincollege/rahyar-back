@@ -24,7 +24,11 @@ export class DevelopmentController {
     @Param('visitorKey') visitorKey: string,
     @Query('range') range = '7d',
   ) {
-    return this.developmentService.getSiteVisitorDetails(user, visitorKey, range);
+    return this.developmentService.getSiteVisitorDetails(
+      user,
+      visitorKey,
+      range,
+    );
   }
 
   @Put('site-visits/devices/:visitorId/label')
@@ -33,7 +37,11 @@ export class DevelopmentController {
     @Param('visitorId') visitorId: string,
     @Body() dto: UpdateVisitorDeviceLabelDto,
   ) {
-    return this.developmentService.updateSiteVisitorDeviceLabel(user, visitorId, dto.label);
+    return this.developmentService.updateSiteVisitorDeviceLabel(
+      user,
+      visitorId,
+      dto.label,
+    );
   }
 
   @Get('accounts')
@@ -65,7 +73,10 @@ export class DevelopmentController {
   }
 
   @Post('test-data/:moduleKey/apply')
-  applyTestData(@CurrentUser() user: AuthenticatedUser, @Param('moduleKey') moduleKey: string) {
+  applyTestData(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('moduleKey') moduleKey: string,
+  ) {
     return this.developmentService.applyTestData(user, moduleKey);
   }
 }

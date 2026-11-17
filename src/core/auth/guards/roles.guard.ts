@@ -45,9 +45,7 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const request = context
-      .switchToHttp()
-      .getRequest<AuthenticatedRequest>();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
     const userRole = request.user?.role;
 
@@ -58,14 +56,11 @@ export class RolesGuard implements CanActivate {
     }
 
     const hasRequiredRole = requiredRoles.some(
-      (requiredRole) =>
-        requiredRole.toLowerCase() === userRole.toLowerCase(),
+      (requiredRole) => requiredRole.toLowerCase() === userRole.toLowerCase(),
     );
 
     if (!hasRequiredRole) {
-      throw new ForbiddenException(
-        'شما مجوز دسترسی به این بخش را ندارید.',
-      );
+      throw new ForbiddenException('شما مجوز دسترسی به این بخش را ندارید.');
     }
 
     return true;

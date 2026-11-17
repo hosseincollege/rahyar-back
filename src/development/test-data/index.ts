@@ -9,8 +9,12 @@ export function isTestDataModuleKey(value: string): value is TestDataModuleKey {
   return (TEST_DATA_MODULES as readonly string[]).includes(value);
 }
 
-export async function seedTestDataModule(key: TestDataModuleKey, context: TestDataContext): Promise<TestDataCounts> {
+export async function seedTestDataModule(
+  key: TestDataModuleKey,
+  context: TestDataContext,
+): Promise<TestDataCounts> {
   switch (key) {
-    case 'settings': return seedSettings(context);
+    case 'settings':
+      return seedSettings(context);
   }
 }

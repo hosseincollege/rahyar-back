@@ -15,7 +15,10 @@ import type { ProjectImportItemDto } from './dto/import-projects.dto';
 export class ProjectsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async getOrganizationId(user: AuthenticatedUser, write = false): Promise<string> {
+  private async getOrganizationId(
+    user: AuthenticatedUser,
+    write = false,
+  ): Promise<string> {
     if (!user.organizationId) {
       throw new BadRequestException('حساب کاربری به سازمان فعالی متصل نیست.');
     }
@@ -30,16 +33,28 @@ export class ProjectsService {
         organization: { select: { ownerId: true } },
         roles: {
           include: {
-            role: { include: { permissions: { include: { permission: { select: { key: true } } } } } },
+            role: {
+              include: {
+                permissions: {
+                  include: { permission: { select: { key: true } } },
+                },
+              },
+            },
           },
         },
       },
     });
-    if (!membership) throw new ForbiddenException('دسترسی به سازمان فعال نیست.');
+    if (!membership)
+      throw new ForbiddenException('دسترسی به سازمان فعال نیست.');
     const roles = membership.roles.map(({ role }) => role);
-    const isAdmin = membership.organization.ownerId === user.id ||
+    const isAdmin =
+      membership.organization.ownerId === user.id ||
       roles.some(({ key }) => key === 'SUPER_ADMIN' || key === 'ADMIN');
-    const permissions = new Set(roles.flatMap(({ permissions }) => permissions.map(({ permission }) => permission.key)));
+    const permissions = new Set(
+      roles.flatMap(({ permissions }) =>
+        permissions.map(({ permission }) => permission.key),
+      ),
+    );
     const canEdit = isAdmin || permissions.has('settings.write');
     const canView = canEdit || permissions.has('settings.read');
     if (write ? !canEdit : !canView) {
@@ -61,7 +76,9 @@ export class ProjectsService {
       },
     });
     if (memberships !== uniqueIds.length) {
-      throw new BadRequestException('همه اعضا باید عضو فعال همین سازمان باشند.');
+      throw new BadRequestException(
+        'همه اعضا باید عضو فعال همین سازمان باشند.',
+      );
     }
     return uniqueIds;
   }
@@ -78,7 +95,9 @@ export class ProjectsService {
     });
 
     if (existing) {
-      throw new ConflictException(`پروژه‌ای با کد ${dto.code} قبلاً ثبت شده است.`);
+      throw new ConflictException(
+        `پروژه‌ای با کد ${dto.code} قبلاً ثبت شده است.`,
+      );
     }
 
     // اضافه کردن اعضا (کاربر ایجادکننده نیز به طور خودکار اضافه می‌شود)
@@ -100,7 +119,12 @@ export class ProjectsService {
         members: {
           include: {
             user: {
-              select: { id: true, username: true, firstName: true, lastName: true },
+              select: {
+                id: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+              },
             },
           },
         },
@@ -116,7 +140,12 @@ export class ProjectsService {
         members: {
           include: {
             user: {
-              select: { id: true, username: true, firstName: true, lastName: true },
+              select: {
+                id: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+              },
             },
           },
         },
@@ -135,7 +164,13 @@ export class ProjectsService {
         members: {
           include: {
             user: {
-              select: { id: true, username: true, firstName: true, lastName: true, email: true },
+              select: {
+                id: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
             },
           },
         },
@@ -161,12 +196,17 @@ export class ProjectsService {
 
   async update(id: string, dto: UpdateProjectDto, user: AuthenticatedUser) {
     const organizationId = await this.getOrganizationId(user, true);
-    const project = await this.prisma.project.findFirst({ where: { id, organizationId } });
+    const project = await this.prisma.project.findFirst({
+      where: { id, organizationId },
+    });
     if (!project) throw new NotFoundException('پروژه یافت نشد.');
 
     // در صورتی که اعضای پروژه ویرایش شده باشند
     if (dto.memberUserIds) {
-      const memberIds = await this.assertMembersBelongToOrganization(dto.memberUserIds, organizationId);
+      const memberIds = await this.assertMembersBelongToOrganization(
+        dto.memberUserIds,
+        organizationId,
+      );
       await this.prisma.projectMember.deleteMany({ where: { projectId: id } });
       await this.prisma.projectMember.createMany({
         data: memberIds.map((userId) => ({
@@ -188,7 +228,14 @@ export class ProjectsService {
       include: {
         members: {
           include: {
-            user: { select: { id: true, username: true, firstName: true, lastName: true } },
+            user: {
+              select: {
+                id: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
           },
         },
       },
@@ -197,7 +244,9 @@ export class ProjectsService {
 
   async remove(id: string, user: AuthenticatedUser) {
     const organizationId = await this.getOrganizationId(user, true);
-    const project = await this.prisma.project.findFirst({ where: { id, organizationId } });
+    const project = await this.prisma.project.findFirst({
+      where: { id, organizationId },
+    });
     if (!project) throw new NotFoundException('پروژه یافت نشد.');
 
     return this.prisma.project.delete({ where: { id } });
@@ -214,7 +263,9 @@ export class ProjectsService {
       select: { code: true },
     });
     if (existing.length) {
-      throw new ConflictException(`کد پروژه از قبل ثبت شده است: ${existing.map(({ code }) => code).join(', ')}`);
+      throw new ConflictException(
+        `کد پروژه از قبل ثبت شده است: ${existing.map(({ code }) => code).join(', ')}`,
+      );
     }
 
     const projects = await this.prisma.$transaction(async (tx) => {
@@ -232,7 +283,11 @@ export class ProjectsService {
         orderBy: { code: 'asc' },
       });
       await tx.projectMember.createMany({
-        data: created.map(({ id }) => ({ projectId: id, userId: user.id, role: 'MANAGER' })),
+        data: created.map(({ id }) => ({
+          projectId: id,
+          userId: user.id,
+          role: 'MANAGER',
+        })),
       });
       return created;
     });

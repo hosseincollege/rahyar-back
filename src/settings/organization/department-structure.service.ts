@@ -86,17 +86,27 @@ export class DepartmentStructureService {
     const { user, ...details } = employee;
     const roles =
       user?.memberships.flatMap((membership) =>
-        membership.roles.map(({ role }) => ({ key: role.key, name: role.name })),
+        membership.roles.map(({ role }) => ({
+          key: role.key,
+          name: role.name,
+        })),
       ) ?? [];
 
     return { ...details, roles };
   }
 
   async getBranchEmployees(branchId: string, user: AuthenticatedUser) {
-    const branch = await this.prisma.branch.findUnique({ where: { id: branchId }, select: { id: true, organizationId: true } });
+    const branch = await this.prisma.branch.findUnique({
+      where: { id: branchId },
+      select: { id: true, organizationId: true },
+    });
     if (!branch) throw new NotFoundException('دفتر موردنظر پیدا نشد.');
-    const access = await this.settingsService.getOrganizationAccess(branch.organizationId, user);
-    if (!access.canView) throw new ForbiddenException('مجوز مشاهده ساختار سازمانی را ندارید.');
+    const access = await this.settingsService.getOrganizationAccess(
+      branch.organizationId,
+      user,
+    );
+    if (!access.canView)
+      throw new ForbiddenException('مجوز مشاهده ساختار سازمانی را ندارید.');
     const employees = await this.prisma.employee.findMany({
       where: { organizationId: branch.organizationId, branchId },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
@@ -169,6 +179,9 @@ export class DepartmentStructureService {
       where: {
         organizationId: department.organizationId,
         departmentId: null,
+        ...(department.branchId && {
+          OR: [{ branchId: null }, { branchId: department.branchId }],
+        }),
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
       select: employeeSummarySelect(department.organizationId),
@@ -216,13 +229,41 @@ export class DepartmentStructureService {
       );
     }
 
-    await this.prisma.employee.update({
-      where: { id: employeeId },
+    if (
+      department.branchId &&
+      employee.branchId &&
+      employee.branchId !== department.branchId
+    ) {
+      throw new ConflictException(
+        'این کارمند به شعبه‌ی دیگری وابسته است. انتقال شعبه را از پرونده‌ی پرسنلی انجام دهید.',
+      );
+    }
+
+    const assignment = await this.prisma.employee.updateMany({
+      where: {
+        id: employeeId,
+        organizationId: department.organizationId,
+        AND: [
+          { OR: [{ departmentId: null }, { departmentId }] },
+          ...(department.branchId
+            ? [
+                {
+                  OR: [{ branchId: null }, { branchId: department.branchId }],
+                },
+              ]
+            : []),
+        ],
+      },
       data: {
         departmentId,
         branchId: department.branchId ?? employee.branchId,
       },
     });
+    if (assignment.count === 0) {
+      throw new ConflictException(
+        'این کارمند همزمان به واحد دیگری تخصیص داده شد. اطلاعات را تازه‌سازی کنید.',
+      );
+    }
     return this.getOverview(departmentId, user);
   }
 
@@ -239,6 +280,22 @@ export class DepartmentStructureService {
     );
 
     await this.prisma.$transaction(async (tx) => {
+      const removal = await tx.employee.updateMany({
+        where: {
+          id: employeeId,
+          organizationId: department.organizationId,
+          departmentId,
+        },
+        data: {
+          departmentId: null,
+          managerId: null,
+        },
+      });
+      if (removal.count === 0) {
+        throw new ConflictException(
+          'انتساب کارمند تغییر کرده است. فهرست را تازه‌سازی کنید.',
+        );
+      }
       await tx.departmentTeamMember.deleteMany({
         where: { employeeId, team: { departmentId } },
       });
@@ -251,16 +308,11 @@ export class DepartmentStructureService {
         data: { managerEmployeeId: null },
       });
       await tx.employee.updateMany({
-        where: { organizationId: department.organizationId, managerId: employeeId },
-        data: { managerId: null },
-      });
-      await tx.employee.update({
-        where: { id: employeeId },
-        data: {
-          departmentId: null,
-          managerId: null,
-          ...(department.branchId && { branchId: null }),
+        where: {
+          organizationId: department.organizationId,
+          managerId: employeeId,
         },
+        data: { managerId: null },
       });
     });
 
@@ -282,14 +334,20 @@ export class DepartmentStructureService {
 
     if (managerId) {
       if (managerId === employeeId) {
-        throw new BadRequestException('کارمند نمی‌تواند مدیر مستقیم خودش باشد.');
+        throw new BadRequestException(
+          'کارمند نمی‌تواند مدیر مستقیم خودش باشد.',
+        );
       }
       await this.requireDepartmentEmployee(
         department.organizationId,
         departmentId,
         managerId,
       );
-      await this.ensureNoReportingCycle(employeeId, managerId, department.organizationId);
+      await this.ensureNoReportingCycle(
+        employeeId,
+        managerId,
+        department.organizationId,
+      );
     }
 
     await this.prisma.employee.update({
@@ -349,7 +407,11 @@ export class DepartmentStructureService {
       include: { members: { select: { employeeId: true } } },
     });
     if (!team) throw new NotFoundException('تیم موردنظر پیدا نشد.');
-    const department = await this.authorizeDepartment(team.departmentId, user, true);
+    const department = await this.authorizeDepartment(
+      team.departmentId,
+      user,
+      true,
+    );
     const employeeIds =
       dto.employeeIds === undefined
         ? team.members.map((member) => member.employeeId)
@@ -461,7 +523,9 @@ export class DepartmentStructureService {
 
     while (currentId) {
       if (currentId === employeeId || visited.has(currentId)) {
-        throw new BadRequestException('این انتساب باعث ایجاد چرخه در سلسله‌مراتب می‌شود.');
+        throw new BadRequestException(
+          'این انتساب باعث ایجاد چرخه در سلسله‌مراتب می‌شود.',
+        );
       }
       visited.add(currentId);
       const current: { managerId: string | null } | null =

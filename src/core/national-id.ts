@@ -1,4 +1,6 @@
-export function normalizeNationalId(value: string | null | undefined): string | null {
+export function normalizeNationalId(
+  value: string | null | undefined,
+): string | null {
   if (!value) return null;
   const normalizedDigits = value
     .trim()

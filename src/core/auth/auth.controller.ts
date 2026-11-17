@@ -17,7 +17,10 @@ import {
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { UpdateUserPreferencesDto, UpdateWorkspaceModeDto } from './dto/update-user-preferences.dto';
+import {
+  UpdateUserPreferencesDto,
+  UpdateWorkspaceModeDto,
+} from './dto/update-user-preferences.dto';
 import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
@@ -43,14 +46,12 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
-  @Public()
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  logout() {
-    return {
-      success: true,
-      message: 'خروج با موفقیت انجام شد',
-    };
+  logout(@Req() request: AuthenticatedRequest) {
+    const userId = request.user?.id;
+    if (!userId) throw new UnauthorizedException('کاربر احراز هویت نشده است.');
+    return this.authService.logout(userId);
   }
 
   @Get('me')
@@ -108,6 +109,9 @@ export class AuthController {
   ) {
     const userId = request.user?.id;
     if (!userId) throw new UnauthorizedException('کاربر احراز هویت نشده است');
-    return this.authService.updateWorkspaceMode(userId, dto.workspaceMode as 'FORM' | 'COMMAND' | 'AI');
+    return this.authService.updateWorkspaceMode(
+      userId,
+      dto.workspaceMode as 'FORM' | 'COMMAND' | 'AI',
+    );
   }
 }

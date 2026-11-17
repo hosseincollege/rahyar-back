@@ -14,7 +14,12 @@ import { JwtAuthGuard } from '../core/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../core/auth/guards/roles.guard';
 import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
 import { NotificationsService } from './notifications.service';
-import { AnnouncementReactionDto, CreateAnnouncementCommentDto, CreateAnnouncementDto, UpdateAnnouncementDto } from './dto/create-announcement.dto';
+import {
+  AnnouncementReactionDto,
+  CreateAnnouncementCommentDto,
+  CreateAnnouncementDto,
+  UpdateAnnouncementDto,
+} from './dto/create-announcement.dto';
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -46,8 +51,14 @@ export class NotificationsController {
   }
 
   @Get('announcements')
-  listAnnouncements(@CurrentUser() user: AuthenticatedUser, @Query('management') management?: string) {
-    return this.notificationsService.listAnnouncements(user, management === 'true');
+  listAnnouncements(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('management') management?: string,
+  ) {
+    return this.notificationsService.listAnnouncements(
+      user,
+      management === 'true',
+    );
   }
 
   @Post('announcements')
@@ -67,22 +78,38 @@ export class NotificationsController {
   }
 
   @Patch('announcements/:id')
-  updateAnnouncement(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: UpdateAnnouncementDto) {
+  updateAnnouncement(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateAnnouncementDto,
+  ) {
     return this.notificationsService.updateAnnouncement(user, id, dto);
   }
 
   @Post('announcements/:id/reactions')
-  toggleReaction(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: AnnouncementReactionDto) {
+  toggleReaction(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: AnnouncementReactionDto,
+  ) {
     return this.notificationsService.toggleReaction(user, id, dto.emoji);
   }
 
   @Post('announcements/:id/comments')
-  addComment(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: CreateAnnouncementCommentDto) {
+  addComment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: CreateAnnouncementCommentDto,
+  ) {
     return this.notificationsService.addComment(user, id, dto);
   }
 
   @Delete('announcements/:id/comments/:commentId')
-  deleteComment(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Param('commentId') commentId: string) {
+  deleteComment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Param('commentId') commentId: string,
+  ) {
     return this.notificationsService.deleteComment(user, id, commentId);
   }
 
@@ -92,10 +119,7 @@ export class NotificationsController {
   }
 
   @Patch(':id/read')
-  markRead(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id') id: string,
-  ) {
+  markRead(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.notificationsService.markRead(user, id);
   }
 }

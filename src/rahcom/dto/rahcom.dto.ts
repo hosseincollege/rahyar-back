@@ -26,12 +26,33 @@ export class RahcomSystemImportRowDto {
   @IsOptional() @IsString() @MaxLength(100) axisCode?: string | null;
   @IsOptional() @IsString() @MaxLength(120) announcedAxis?: string | null;
   @IsOptional() @IsBoolean() longOutage?: boolean;
-  @IsOptional() @IsIn(['THEFT_DAMAGE', 'RELOCATION', 'ELECTRICITY_DEBT', 'PAYMENT_ARREARS', 'POWER_OUTAGE', 'OTHER']) longOutageReason?: string | null;
+  @IsOptional()
+  @IsIn([
+    'THEFT_DAMAGE',
+    'RELOCATION',
+    'ELECTRICITY_DEBT',
+    'PAYMENT_ARREARS',
+    'POWER_OUTAGE',
+    'OTHER',
+  ])
+  longOutageReason?: string | null;
   @IsOptional() @IsString() @MaxLength(1000) longOutageDetails?: string | null;
-  @IsOptional() @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE', 'WIDENING_RELOCATION']) incidentType?: string | null;
+  @IsOptional()
+  @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE', 'WIDENING_RELOCATION'])
+  incidentType?: string | null;
   @IsOptional() @IsString() @MaxLength(1000) incidentDetails?: string | null;
-  @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-90) @Max(90) latitude?: number | null;
-  @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-180) @Max(180) longitude?: number | null;
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(-90)
+  @Max(90)
+  latitude?: number | null;
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(-180)
+  @Max(180)
+  longitude?: number | null;
   @IsOptional() @IsString() @MaxLength(1000) details?: string | null;
   @IsOptional() @IsString() @MaxLength(120) electricityBillId?: string | null;
   @IsOptional() @IsString() @MaxLength(100) simIp?: string | null;
@@ -44,7 +65,11 @@ export class RahcomSystemImportRowDto {
 
 export class ImportRahcomSystemsDto {
   @IsString() @MinLength(1) @MaxLength(80) province!: string;
-  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10000) @ValidateNested({ each: true }) @Type(() => RahcomSystemImportRowDto)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(10000)
+  @ValidateNested({ each: true })
+  @Type(() => RahcomSystemImportRowDto)
   systems!: RahcomSystemImportRowDto[];
 }
 
@@ -54,8 +79,18 @@ export class CreateRahcomSystemDto {
   @IsString() @MinLength(1) @MaxLength(100) systemCode!: string;
   @IsString() @MinLength(1) @MaxLength(100) axisCode!: string;
   @IsString() @MinLength(1) @MaxLength(120) announcedAxis!: string;
-  @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-90) @Max(90) latitude?: number;
-  @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-180) @Max(180) longitude?: number;
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(-90)
+  @Max(90)
+  latitude?: number;
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(-180)
+  @Max(180)
+  longitude?: number;
   @IsOptional() @IsString() @MaxLength(120) electricityBillId?: string | null;
 }
 
@@ -67,12 +102,33 @@ export class UpdateRahcomSystemDto {
   @IsOptional() @IsString() @MaxLength(100) axisCode?: string | null;
   @IsOptional() @IsString() @MaxLength(120) announcedAxis?: string | null;
   @IsOptional() @IsBoolean() longOutage?: boolean;
-  @IsOptional() @IsIn(['THEFT_DAMAGE', 'RELOCATION', 'ELECTRICITY_DEBT', 'PAYMENT_ARREARS', 'POWER_OUTAGE', 'OTHER']) longOutageReason?: string | null;
+  @IsOptional()
+  @IsIn([
+    'THEFT_DAMAGE',
+    'RELOCATION',
+    'ELECTRICITY_DEBT',
+    'PAYMENT_ARREARS',
+    'POWER_OUTAGE',
+    'OTHER',
+  ])
+  longOutageReason?: string | null;
   @IsOptional() @IsString() @MaxLength(1000) longOutageDetails?: string | null;
-  @IsOptional() @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE', 'WIDENING_RELOCATION']) incidentType?: string | null;
+  @IsOptional()
+  @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE', 'WIDENING_RELOCATION'])
+  incidentType?: string | null;
   @IsOptional() @IsString() @MaxLength(1000) incidentDetails?: string | null;
-  @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-90) @Max(90) latitude?: number | null;
-  @IsOptional() @Type(() => Number) @IsNumber({ allowNaN: false, allowInfinity: false }) @Min(-180) @Max(180) longitude?: number | null;
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(-90)
+  @Max(90)
+  latitude?: number | null;
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(-180)
+  @Max(180)
+  longitude?: number | null;
   @IsOptional() @IsString() @MaxLength(1000) details?: string | null;
   @IsOptional() @IsString() @MaxLength(120) electricityBillId?: string | null;
   @IsOptional() @IsString() @MaxLength(100) simIp?: string | null;
@@ -105,26 +161,44 @@ export class CreateRahcomSolarSnapshotDto {
   @IsString() @MaxLength(80) @Matches(/^[a-z]+(?:-[a-z]+)*$/) province!: string;
   @IsString() @MaxLength(250000) downText!: string;
   @IsString() @MaxLength(250000) unreachableText!: string;
-  @IsArray() @ArrayNotEmpty() @ArrayMaxSize(50) @IsString({ each: true }) equipmentColumns!: string[];
-  @IsOptional() @IsString() @Matches(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})?$/) capturedAt?: string;
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  equipmentColumns!: string[];
+  @IsOptional()
+  @IsString()
+  @Matches(
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})?$/,
+  )
+  capturedAt?: string;
 }
 
 export class ReplaceRahcomSolarSpecialSystemsDto {
   @IsString() @MaxLength(80) @Matches(/^[a-z]+(?:-[a-z]+)*$/) province!: string;
-  @IsArray() @ArrayMaxSize(10000) @ValidateNested({ each: true }) @Type(() => RahcomSolarSpecialSystemDto)
+  @IsArray()
+  @ArrayMaxSize(10000)
+  @ValidateNested({ each: true })
+  @Type(() => RahcomSolarSpecialSystemDto)
   systems!: RahcomSolarSpecialSystemDto[];
 }
 
 export class RahcomSolarSpecialSystemDto {
   @IsString() @Matches(/^\d{3}[A-Z]\d{5}$/i) systemCode!: string;
-  @IsString() @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE', 'WIDENING_RELOCATION']) category!: string;
+  @IsString()
+  @IsIn(['THEFT', 'DAMAGE', 'THEFT_AND_DAMAGE', 'WIDENING_RELOCATION'])
+  category!: string;
 }
 
 export class CreateRahcomTrafficSnapshotDto {
   @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) snapshotDate!: string;
   @IsString() @MinLength(1) @MaxLength(255) fileName!: string;
   @IsString() @MinLength(1) @MaxLength(120) sheetName!: string;
-  @IsArray() @ArrayMinSize(2) @ArrayMaxSize(50) @IsString({ each: true }) headers!: string[];
+  @IsArray()
+  @ArrayMinSize(2)
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  headers!: string[];
   @IsArray() @ArrayMaxSize(10000) rows!: string[][];
 }
 
@@ -147,7 +221,11 @@ export class ImportRahcomTicketsDto {
   @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) listDate!: string;
   @IsString() @MaxLength(80) @Matches(/^[a-z]+(?:-[a-z]+)*$/) province!: string;
   @IsString() @MinLength(1) @MaxLength(255) sourceFileName!: string;
-  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10000) @ValidateNested({ each: true }) @Type(() => RahcomImportedTicketRowDto)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(10000)
+  @ValidateNested({ each: true })
+  @Type(() => RahcomImportedTicketRowDto)
   tickets!: RahcomImportedTicketRowDto[];
 }
 
@@ -160,13 +238,21 @@ export class ReplaceRahcomRoadListDto {
   @IsString() @MinLength(1) @MaxLength(255) fileName!: string;
   @IsString() @MinLength(1) @MaxLength(120) sheetName!: string;
   @IsString() @MaxLength(80) @Matches(/^[a-z]+(?:-[a-z]+)*$/) province!: string;
-  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(100) @IsString({ each: true }) headers!: string[];
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  headers!: string[];
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(10000) rows!: string[][];
 }
 
 export class ReplaceRahcomBillIdentifierListDto {
   @IsString() @MaxLength(80) @Matches(/^[a-z]+(?:-[a-z]+)*$/) province!: string;
-  @IsArray() @ArrayMinSize(2) @ArrayMaxSize(100) @IsString({ each: true }) headers!: string[];
+  @IsArray()
+  @ArrayMinSize(2)
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  headers!: string[];
   @IsArray() @ArrayMaxSize(20000) rows!: string[][];
 }
 
@@ -180,7 +266,9 @@ export class UpdateRahcomSelectedProvinceDto {
 
 export class CreateRahcomActivityDto {
   @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) date!: string;
-  @IsString() @IsIn(['EMAIL_SENT', 'SYSTEM_VISIT', 'OTHER']) activityType!: string;
+  @IsString()
+  @IsIn(['EMAIL_SENT', 'SYSTEM_VISIT', 'OTHER'])
+  activityType!: string;
   @Type(() => Number) @IsInt() @Min(1) @Max(100000) quantity!: number;
   @IsOptional() @IsString() @MaxLength(1000) description?: string | null;
   @IsOptional() @IsString() @MaxLength(100) systemId?: string;
@@ -213,5 +301,9 @@ export class DeleteRahcomSystemsQueryDto {
 }
 
 export class DeleteRahcomSystemsBodyDto {
-  @IsOptional() @IsArray() @ArrayMaxSize(10000) @IsString({ each: true }) ids?: string[];
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10000)
+  @IsString({ each: true })
+  ids?: string[];
 }

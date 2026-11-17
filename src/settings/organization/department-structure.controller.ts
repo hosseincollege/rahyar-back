@@ -28,10 +28,7 @@ export class DepartmentStructureController {
   constructor(private readonly structureService: DepartmentStructureService) {}
 
   @Get('departments/:id/overview')
-  getOverview(
-    @Param('id') id: string,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
+  getOverview(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.structureService.getOverview(id.trim(), user);
   }
 
@@ -70,7 +67,11 @@ export class DepartmentStructureController {
     @Body() dto: AssignDepartmentEmployeeDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.structureService.assignEmployee(id.trim(), dto.employeeId, user);
+    return this.structureService.assignEmployee(
+      id.trim(),
+      dto.employeeId,
+      user,
+    );
   }
 
   @Put('departments/:id/employees/:employeeId/manager')

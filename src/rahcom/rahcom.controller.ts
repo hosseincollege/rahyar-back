@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentUser } from '../core/auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../core/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../core/auth/guards/roles.guard';
@@ -37,83 +47,160 @@ export class RahcomController {
     return this.service.getRahcomAccess(user);
   }
   @Put('me/province')
-  updateMySelectedProvince(@CurrentUser() user: AuthenticatedUser, @Body() body: UpdateRahcomSelectedProvinceDto) {
+  updateMySelectedProvince(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: UpdateRahcomSelectedProvinceDto,
+  ) {
     return this.service.updateSelectedProvince(user, body.province);
   }
   @Get('systems')
-  listSystems(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
+  listSystems(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RahcomProvinceQueryDto,
+  ) {
     return this.service.listSystems(user, query.province);
   }
   @Post('systems')
-  createSystem(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomSystemDto) {
+  createSystem(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: CreateRahcomSystemDto,
+  ) {
     return this.service.createSystem(user, body);
   }
   @Post('systems/import')
-  importSystems(@CurrentUser() user: AuthenticatedUser, @Body() body: ImportRahcomSystemsDto) {
+  importSystems(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: ImportRahcomSystemsDto,
+  ) {
     return this.service.importSystems(user, body);
   }
   @Put('systems/:id')
-  updateSystem(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: UpdateRahcomSystemDto) {
+  updateSystem(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() body: UpdateRahcomSystemDto,
+  ) {
     return this.service.updateSystem(user, id, body);
   }
   @Delete('systems/:id')
-  deleteSystem(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+  deleteSystem(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
     return this.service.deleteSystem(user, id);
   }
   @Delete('systems')
-  deleteSystems(@CurrentUser() user: AuthenticatedUser, @Query() query: DeleteRahcomSystemsQueryDto, @Body() body: DeleteRahcomSystemsBodyDto) {
-    return this.service.deleteSystems(user, { province: query.province, ids: body.ids });
+  deleteSystems(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: DeleteRahcomSystemsQueryDto,
+    @Body() body: DeleteRahcomSystemsBodyDto,
+  ) {
+    return this.service.deleteSystems(user, {
+      province: query.province,
+      ids: body.ids,
+    });
   }
   @Get('systems/:id/activities')
-  listSystemActivities(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Query('date') date: string) {
+  listSystemActivities(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Query('date') date: string,
+  ) {
     return this.service.listSystemActivities(user, id, date);
   }
   @Post('systems/:id/activities')
-  createSystemActivity(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: CreateRahcomSystemActivityDto) {
+  createSystemActivity(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() body: CreateRahcomSystemActivityDto,
+  ) {
     return this.service.createSystemActivity(user, id, body);
   }
   @Get('activities')
-  listActivities(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomActivitiesQueryDto) {
+  listActivities(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RahcomActivitiesQueryDto,
+  ) {
     return this.service.listActivities(user, query);
   }
   @Post('activities')
-  createActivity(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomActivityDto) {
+  createActivity(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: CreateRahcomActivityDto,
+  ) {
     return this.service.createActivity(user, body);
   }
   @Put('activities/daily-workflow')
-  saveDailyWorkflow(@CurrentUser() user: AuthenticatedUser, @Body() body: SaveRahcomDailyWorkflowDto) {
+  saveDailyWorkflow(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: SaveRahcomDailyWorkflowDto,
+  ) {
     return this.service.saveDailyWorkflow(user, body);
   }
   @Get('tickets')
-  listImportedTickets(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
+  listImportedTickets(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RahcomProvinceQueryDto,
+  ) {
     return this.service.listImportedTickets(user, query.province, query.date);
   }
   @Post('tickets/import')
-  importTickets(@CurrentUser() user: AuthenticatedUser, @Body() body: ImportRahcomTicketsDto) {
+  importTickets(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: ImportRahcomTicketsDto,
+  ) {
     return this.service.importTickets(user, body);
   }
   @Put('tickets/:id/description')
-  updateImportedTicketDescription(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: UpdateRahcomImportedTicketDescriptionDto) {
-    return this.service.updateImportedTicketDescription(user, id, body.description);
+  updateImportedTicketDescription(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() body: UpdateRahcomImportedTicketDescriptionDto,
+  ) {
+    return this.service.updateImportedTicketDescription(
+      user,
+      id,
+      body.description,
+    );
   }
   @Get('road-list')
-  getRoadList(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
+  getRoadList(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RahcomProvinceQueryDto,
+  ) {
     return this.service.getRoadList(user, query.province, query.date);
   }
   @Get('bill-identifiers')
-  getBillIdentifiers(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
+  getBillIdentifiers(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RahcomProvinceQueryDto,
+  ) {
     return this.service.getBillIdentifiers(user, query.province);
   }
   @Put('bill-identifiers')
-  replaceBillIdentifiers(@CurrentUser() user: AuthenticatedUser, @Body() body: ReplaceRahcomBillIdentifierListDto) {
+  replaceBillIdentifiers(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: ReplaceRahcomBillIdentifierListDto,
+  ) {
     return this.service.replaceBillIdentifiers(user, body);
   }
   @Get('road-list/dates')
-  getRoadListDates(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomTrafficSnapshotDatesQueryDto) {
-    return this.service.listRoadListDates(user, query.province, query.from, query.to);
+  getRoadListDates(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RahcomTrafficSnapshotDatesQueryDto,
+  ) {
+    return this.service.listRoadListDates(
+      user,
+      query.province,
+      query.from,
+      query.to,
+    );
   }
   @Put('road-list')
-  replaceRoadList(@CurrentUser() user: AuthenticatedUser, @Body() body: ReplaceRahcomRoadListDto) {
+  replaceRoadList(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: ReplaceRahcomRoadListDto,
+  ) {
     return this.service.replaceRoadList(user, body);
   }
   @Get('members')
@@ -121,55 +208,106 @@ export class RahcomController {
     return this.service.listProvinceAssignments(user);
   }
   @Put('members/:id/province')
-  updateProvinceAssignment(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: UpdateRahcomMemberProvinceDto) {
-    return this.service.updateProvinceAssignment(user, id, body.province ?? null);
+  updateProvinceAssignment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() body: UpdateRahcomMemberProvinceDto,
+  ) {
+    return this.service.updateProvinceAssignment(
+      user,
+      id,
+      body.province ?? null,
+    );
   }
   @Get('solar-snapshots')
-  listSolarSnapshots(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
+  listSolarSnapshots(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RahcomProvinceQueryDto,
+  ) {
     return this.service.listSolarSnapshots(user, query.province, query.date);
   }
   @Post('solar-snapshots')
-  createSolarSnapshot(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomSolarSnapshotDto) {
+  createSolarSnapshot(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: CreateRahcomSolarSnapshotDto,
+  ) {
     return this.service.createSolarSnapshot(user, body);
   }
   @Put('solar-snapshots/:id')
-  updateSolarSnapshot(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: CreateRahcomSolarSnapshotDto) {
+  updateSolarSnapshot(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() body: CreateRahcomSolarSnapshotDto,
+  ) {
     return this.service.updateSolarSnapshot(user, id, body);
   }
   @Delete('solar-snapshots/:id')
-  deleteSolarSnapshot(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+  deleteSolarSnapshot(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
     return this.service.deleteSolarSnapshot(user, id);
   }
   @Get('solar-special-systems')
-  listSolarSpecialSystems(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
+  listSolarSpecialSystems(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RahcomProvinceQueryDto,
+  ) {
     return this.service.listSolarSpecialSystems(user, query.province);
   }
   @Put('solar-special-systems')
-  replaceSolarSpecialSystems(@CurrentUser() user: AuthenticatedUser, @Body() body: ReplaceRahcomSolarSpecialSystemsDto) {
+  replaceSolarSpecialSystems(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: ReplaceRahcomSolarSpecialSystemsDto,
+  ) {
     return this.service.replaceSolarSpecialSystems(user, body);
   }
   @Get('traffic-snapshot')
-  listTrafficSnapshot(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
+  listTrafficSnapshot(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RahcomProvinceQueryDto,
+  ) {
     return this.service.listTrafficSnapshot(user, query.province, query.date);
   }
   @Get('traffic-snapshot/dates')
-  listTrafficSnapshotDates(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomTrafficSnapshotDatesQueryDto) {
-    return this.service.listTrafficSnapshotDates(user, query.province, query.from, query.to);
+  listTrafficSnapshotDates(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RahcomTrafficSnapshotDatesQueryDto,
+  ) {
+    return this.service.listTrafficSnapshotDates(
+      user,
+      query.province,
+      query.from,
+      query.to,
+    );
   }
   @Get('traffic-snapshot/history')
-  listTrafficSystemHistory(@CurrentUser() user: AuthenticatedUser, @Query('systemCode') systemCode: string, @Query('date') date: string) {
+  listTrafficSystemHistory(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('systemCode') systemCode: string,
+    @Query('date') date: string,
+  ) {
     return this.service.listTrafficSystemHistory(user, systemCode, date);
   }
   @Post('traffic-snapshots')
-  createTrafficSnapshot(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomTrafficSnapshotDto) {
+  createTrafficSnapshot(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: CreateRahcomTrafficSnapshotDto,
+  ) {
     return this.service.createTrafficSnapshot(user, body);
   }
   @Post('traffic-snapshot/apply-axes')
-  applyTrafficAxes(@CurrentUser() user: AuthenticatedUser, @Query('date') date: string) {
+  applyTrafficAxes(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('date') date: string,
+  ) {
     return this.service.applyTrafficAxes(user, date);
   }
   @Delete('activities/:id')
-  deleteActivity(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+  deleteActivity(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
     return this.service.deleteActivity(user, id);
   }
 }

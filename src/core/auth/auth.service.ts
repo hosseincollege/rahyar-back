@@ -61,63 +61,68 @@ export class AuthService {
       throw new ConflictException('کاربری با این مشخصات قبلاً ثبت شده است');
     }
 
-    const { user, organizationId } = await this.prisma.$transaction(async (tx) => {
-      if (await tx.user.count() > 0) {
-        throw new ForbiddenException('ثبت‌نام عمومی بسته است؛ حساب کاربری را مالک سامانه ایجاد می‌کند.');
-      }
+    const { user, organizationId } = await this.prisma.$transaction(
+      async (tx) => {
+        if ((await tx.user.count()) > 0) {
+          throw new ForbiddenException(
+            'ثبت‌نام عمومی بسته است؛ حساب کاربری را مالک سامانه ایجاد می‌کند.',
+          );
+        }
 
-      const passwordHash = await bcrypt.hash(dto.password, 12);
-      const user = await tx.user.create({
-        data: {
-          username: dto.username,
-          email: dto.email ?? null,
-          phone: dto.phone ?? null,
-          nationalId: normalizeNationalId(dto.nationalCode),
-          firstName: dto.firstName,
-          lastName: dto.lastName,
-          passwordHash,
-          status: 'ACTIVE',
-          isSystemUser: true,
-        },
-      });
+        const passwordHash = await bcrypt.hash(dto.password, 12);
+        const user = await tx.user.create({
+          data: {
+            username: dto.username,
+            email: dto.email ?? null,
+            phone: dto.phone ?? null,
+            nationalId: normalizeNationalId(dto.nationalCode),
+            firstName: dto.firstName,
+            lastName: dto.lastName,
+            passwordHash,
+            status: 'ACTIVE',
+            isSystemUser: true,
+          },
+        });
 
-      const organization = await tx.organization.create({
-        data: {
-          name: `${user.firstName} ${user.lastName}`.trim(),
-          slug: `${user.username}-${user.id}`,
-          ownerId: user.id,
-          status: 'ACTIVE',
-        },
-      });
+        const organization = await tx.organization.create({
+          data: {
+            name: `${user.firstName} ${user.lastName}`.trim(),
+            slug: `${user.username}-${user.id}`,
+            ownerId: user.id,
+            status: 'ACTIVE',
+          },
+        });
 
-      const membership = await tx.organizationMember.create({
-        data: {
-          userId: user.id,
-          organizationId: organization.id,
-          status: 'ACTIVE',
-        },
-      });
+        const membership = await tx.organizationMember.create({
+          data: {
+            userId: user.id,
+            organizationId: organization.id,
+            status: 'ACTIVE',
+          },
+        });
 
-      const role = await tx.role.create({
-        data: {
-          name: 'Super Admin',
-          key: 'SUPER_ADMIN',
-          description: 'دسترسی کامل مدیر ارشد سیستم',
-          scope: 'ORGANIZATION',
-          isSystemRole: true,
-          organizationId: organization.id,
-        },
-      });
+        const role = await tx.role.create({
+          data: {
+            name: 'Super Admin',
+            key: 'SUPER_ADMIN',
+            description: 'دسترسی کامل مدیر ارشد سیستم',
+            scope: 'ORGANIZATION',
+            isSystemRole: true,
+            organizationId: organization.id,
+          },
+        });
 
-      await tx.memberRole.create({
-        data: {
-          memberId: membership.id,
-          roleId: role.id,
-        },
-      });
+        await tx.memberRole.create({
+          data: {
+            memberId: membership.id,
+            roleId: role.id,
+          },
+        });
 
-      return { user, organizationId: organization.id };
-    }, { isolationLevel: 'Serializable' });
+        return { user, organizationId: organization.id };
+      },
+      { isolationLevel: 'Serializable' },
+    );
     return this.createAuthResponse(user, organizationId);
   }
 
@@ -141,7 +146,9 @@ export class AuthService {
 
     if (!user || !passwordIsValid || user.status !== 'ACTIVE') {
       await this.recordLoginFailure(keyHash);
-      throw new UnauthorizedException('\u06a9\u0627\u0631\u0628\u0631 \u06cc\u0627 \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0646\u0627\u062f\u0631\u0633\u062a \u0627\u0633\u062a.');
+      throw new UnauthorizedException(
+        '\u06a9\u0627\u0631\u0628\u0631 \u06cc\u0627 \u0631\u0645\u0632 \u0639\u0628\u0648\u0631 \u0646\u0627\u062f\u0631\u0633\u062a \u0627\u0633\u062a.',
+      );
     }
 
     await this.prisma.authLoginAttempt.deleteMany({ where: { keyHash } });
@@ -159,26 +166,52 @@ export class AuthService {
     return this.createAuthResponse(user, membership?.organizationId ?? null);
   }
 
+  async logout(userId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+      select: { id: true },
+    });
+
+    return { success: true, message: 'خروج با موفقیت انجام شد' };
+  }
+
   private dummyPasswordHash: Promise<string> | null = null;
 
   private async compareAgainstDummyHash(password: string): Promise<boolean> {
-    this.dummyPasswordHash ??= bcrypt.hash('not-a-real-rahyar-account-password', 12);
+    this.dummyPasswordHash ??= bcrypt.hash(
+      'not-a-real-rahyar-account-password',
+      12,
+    );
     return bcrypt.compare(password, await this.dummyPasswordHash);
   }
 
   private getLoginRateLimitKey(identifier: string): string {
-    const secret = this.configService.get<string>('JWT_SECRET') ?? process.env.JWT_SECRET;
-    if (!secret) throw new Error('JWT_SECRET is required to protect login attempt keys.');
-    const normalizedIdentifier = identifier.trim().normalize('NFKC').toLocaleLowerCase('en-US');
-    return createHmac('sha256', secret).update(normalizedIdentifier).digest('hex');
+    const secret =
+      this.configService.get<string>('JWT_SECRET') ?? process.env.JWT_SECRET;
+    if (!secret)
+      throw new Error('JWT_SECRET is required to protect login attempt keys.');
+    const normalizedIdentifier = identifier
+      .trim()
+      .normalize('NFKC')
+      .toLocaleLowerCase('en-US');
+    return createHmac('sha256', secret)
+      .update(normalizedIdentifier)
+      .digest('hex');
   }
 
   private async ensureLoginAllowed(keyHash: string): Promise<void> {
-    const bucket = await this.prisma.authLoginAttempt.findUnique({ where: { keyHash } });
+    const bucket = await this.prisma.authLoginAttempt.findUnique({
+      where: { keyHash },
+    });
     if (!bucket) return;
-    const expired = Date.now() - bucket.windowStartedAt.getTime() >= LOGIN_WINDOW_MS;
+    const expired =
+      Date.now() - bucket.windowStartedAt.getTime() >= LOGIN_WINDOW_MS;
     if (!expired && bucket.attempts >= LOGIN_LIMIT) {
-      throw new HttpException('AUTH_RATE_LIMITED', HttpStatus.TOO_MANY_REQUESTS);
+      throw new HttpException(
+        'AUTH_RATE_LIMITED',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
   }
 
@@ -186,22 +219,45 @@ export class AuthService {
     const now = new Date();
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        await this.prisma.$transaction(async (tx) => {
-          const bucket = await tx.authLoginAttempt.findUnique({ where: { keyHash } });
-          if (!bucket) {
-            await tx.authLoginAttempt.create({ data: { keyHash, attempts: 1, windowStartedAt: now } });
-          } else if (now.getTime() - bucket.windowStartedAt.getTime() >= LOGIN_WINDOW_MS) {
-            await tx.authLoginAttempt.update({ where: { keyHash }, data: { attempts: 1, windowStartedAt: now } });
-          } else {
-            await tx.authLoginAttempt.update({ where: { keyHash }, data: { attempts: { increment: 1 } } });
-          }
-        }, { isolationLevel: 'Serializable' });
+        await this.prisma.$transaction(
+          async (tx) => {
+            const bucket = await tx.authLoginAttempt.findUnique({
+              where: { keyHash },
+            });
+            if (!bucket) {
+              await tx.authLoginAttempt.create({
+                data: { keyHash, attempts: 1, windowStartedAt: now },
+              });
+            } else if (
+              now.getTime() - bucket.windowStartedAt.getTime() >=
+              LOGIN_WINDOW_MS
+            ) {
+              await tx.authLoginAttempt.update({
+                where: { keyHash },
+                data: { attempts: 1, windowStartedAt: now },
+              });
+            } else {
+              await tx.authLoginAttempt.update({
+                where: { keyHash },
+                data: { attempts: { increment: 1 } },
+              });
+            }
+          },
+          { isolationLevel: 'Serializable' },
+        );
 
-        if (now.getTime() - lastLoginRateCleanupAt >= LOGIN_RATE_CLEANUP_INTERVAL_MS) {
+        if (
+          now.getTime() - lastLoginRateCleanupAt >=
+          LOGIN_RATE_CLEANUP_INTERVAL_MS
+        ) {
           lastLoginRateCleanupAt = now.getTime();
           try {
             await this.prisma.authLoginAttempt.deleteMany({
-              where: { windowStartedAt: { lt: new Date(now.getTime() - 24 * 60 * 60 * 1000) } },
+              where: {
+                windowStartedAt: {
+                  lt: new Date(now.getTime() - 24 * 60 * 60 * 1000),
+                },
+              },
             });
           } catch {
             // Cleanup is best effort; failed-login tracking remains committed.
@@ -209,8 +265,14 @@ export class AuthService {
         }
         return;
       } catch (error) {
-        const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : null;
-        if ((code !== 'P2034' && code !== 'P2002') || attempt === 2) throw error;
+        const code =
+          error instanceof Error &&
+          'code' in error &&
+          typeof error.code === 'string'
+            ? error.code
+            : null;
+        if ((code !== 'P2034' && code !== 'P2002') || attempt === 2)
+          throw error;
       }
     }
   }
@@ -440,7 +502,10 @@ export class AuthService {
     });
   }
 
-  async updateWorkspaceMode(userId: string, workspaceMode: 'FORM' | 'COMMAND' | 'AI') {
+  async updateWorkspaceMode(
+    userId: string,
+    workspaceMode: 'FORM' | 'COMMAND' | 'AI',
+  ) {
     return this.prisma.userPreference.upsert({
       where: { userId },
       create: { userId, workspaceMode },

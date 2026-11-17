@@ -41,8 +41,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
   ) {
-    const jwtSecret = configService.get<string>('JWT_SECRET') ?? process.env.JWT_SECRET;
-    if (!jwtSecret) throw new Error('JWT_SECRET is required to validate Rahyar sessions.');
+    const jwtSecret =
+      configService.get<string>('JWT_SECRET') ?? process.env.JWT_SECRET;
+    if (!jwtSecret)
+      throw new Error('JWT_SECRET is required to validate Rahyar sessions.');
 
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -59,11 +61,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const user = await this.authService.validateUser(payload.sub);
 
     if (!user) {
-      throw new UnauthorizedException('کاربر یافت نشد یا حساب کاربری فعال نیست');
+      throw new UnauthorizedException(
+        'کاربر یافت نشد یا حساب کاربری فعال نیست',
+      );
     }
 
     if ((payload.tokenVersion ?? 0) !== user.tokenVersion) {
-      throw new UnauthorizedException('نشست شما با تغییر رمز عبور منقضی شده است؛ دوباره وارد شوید.');
+      throw new UnauthorizedException(
+        'نشست شما با تغییر رمز عبور منقضی شده است؛ دوباره وارد شوید.',
+      );
     }
 
     let organizationId: string | null = null;
