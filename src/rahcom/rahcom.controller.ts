@@ -63,6 +63,13 @@ export class RahcomController {
   ) {
     return this.service.listSystems(user, query.province);
   }
+  @Get('sites')
+  listSites(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RahcomProvinceQueryDto,
+  ) {
+    return this.service.listSites(user, query.province);
+  }
   @Get('systems/search')
   searchSystems(
     @CurrentUser() user: AuthenticatedUser,

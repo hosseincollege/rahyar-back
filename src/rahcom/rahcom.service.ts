@@ -5,6 +5,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../core/prisma/prisma.service';
 import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
@@ -37,6 +39,11 @@ type RahcomAccess = {
   province: string | null;
   selectedProvince: string | null;
 };
+
+type RahcomSitesWorkbook = Array<{ name: string; rows: string[][] }>;
+const rahcomSitesWorkbook = JSON.parse(
+  readFileSync(join(__dirname, 'data', 'uso-sites.json'), 'utf8'),
+) as RahcomSitesWorkbook;
 
 function cellText(value: unknown): string {
   if (typeof value === 'string') return value;
@@ -228,6 +235,29 @@ export class RahcomService {
         'You can only access Rahcom data for your assigned province.',
       );
     return access.province;
+  }
+  async listSites(user: AuthenticatedUser, requestedProvince?: string) {
+    const access = await this.authorize(user);
+    const province = this.scopedProvince(access, requestedProvince);
+    return rahcomSitesWorkbook.map((sheet) => {
+      if (!province) return sheet;
+      const headers = sheet.rows[0] ?? [];
+      const provinceIndex = headers.findIndex(
+        (header) =>
+          normalizeBillHeader(header) === '\u0627\u0633\u062a\u0627\u0646',
+      );
+      if (provinceIndex < 0) return sheet;
+      return {
+        ...sheet,
+        rows: [
+          headers,
+          ...sheet.rows.slice(1).filter((row) => {
+            const label = row[provinceIndex]?.trim();
+            return label && rahcomProvinceIdFromLabel(label) === province;
+          }),
+        ],
+      };
+    });
   }
   async getRahcomAccess(user: AuthenticatedUser) {
     const access = await this.authorize(user);
