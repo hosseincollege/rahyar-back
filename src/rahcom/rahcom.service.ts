@@ -73,6 +73,24 @@ function normalizeBillIdentifier(value: string): string {
     .replace(/\s/g, '');
 }
 
+function hasMixedBillSystemFamilies(value: string): boolean {
+  const families = new Set(
+    value
+      .split(/[;,|]/)
+      .map((code) => code.trim())
+      .filter(Boolean)
+      .map((code) => {
+        const externalType = code
+          .match(/^EXTERNAL:(USO|RAHCOM|BST|VSAT):/i)?.[1]
+          ?.toUpperCase();
+        return externalType && externalType !== 'RAHCOM'
+          ? externalType
+          : 'RAHCOM';
+      }),
+  );
+  return families.size > 1;
+}
+
 @Injectable()
 export class RahcomService {
   private readonly demoSystemPrefix = 'DEMO-RAHCOM-';
@@ -429,6 +447,18 @@ export class RahcomService {
     const normalizedHeaders = headers.map(normalizeBillHeader);
     if (new Set(normalizedHeaders).size !== normalizedHeaders.length)
       throw new BadRequestException('Bill identifier headers must be unique.');
+    const systemCodeColumn = normalizedHeaders.findIndex((header) =>
+      ['کدسامانه', 'کدسیستم'].includes(header),
+    );
+    if (
+      systemCodeColumn >= 0 &&
+      body.rows.some((row) =>
+        hasMixedBillSystemFamilies(row[systemCodeColumn] ?? ''),
+      )
+    )
+      throw new BadRequestException(
+        'A bill can only be assigned to one system family.',
+      );
     const billIdentifierColumn = normalizedHeaders.findIndex((header) =>
       ['شناسهقبض', 'شناسهقبضبرق'].includes(header),
     );
