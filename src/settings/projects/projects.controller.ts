@@ -13,7 +13,7 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { JwtAuthGuard } from '../../core/auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../core/auth/decorators/current-user.decorator';
-import type { AuthenticatedUser } from '../../core/auth/strategies/jwt.strategy';
+import type { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import { ImportProjectsDto } from './dto/import-projects.dto';
 
 @Controller('projects')

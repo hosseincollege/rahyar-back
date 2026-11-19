@@ -5,12 +5,12 @@ import {
 } from '@nestjs/common';
 import { AuditAction, Prisma } from '@prisma/client';
 import { PrismaService } from '../core/prisma/prisma.service';
-import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
+import type { AuthenticatedUser } from '../core/auth/jwt.strategy';
 import { SystemService } from '../system/system.service';
 import type {
   CreateAnnouncementCommentDto,
   CreateAnnouncementDto,
-} from './dto/create-announcement.dto';
+} from './create-announcement.dto';
 
 export type LocalizedNotificationText = Record<
   'fa' | 'en' | 'ar' | 'zh-CN' | 'fr' | 'es' | 'de' | 'ru' | 'ja' | 'pt-BR',

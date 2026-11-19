@@ -1,4 +1,4 @@
-// Path: backend/src/settings/dto/import-organization.dto.ts
+// Path: backend/src/settings/company/dto/import-organization.dto.ts
 // این DTO ساختار داده‌های ورودی برای عملیات درون‌ریزی سازمان، شعب و دپارتمان‌ها را تعیین و اعتبارسنجی می‌کند.
 
 import {

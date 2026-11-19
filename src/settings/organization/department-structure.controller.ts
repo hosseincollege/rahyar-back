@@ -12,7 +12,7 @@ import {
 import { CurrentUser } from '../../core/auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../core/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../core/auth/guards/roles.guard';
-import type { AuthenticatedUser } from '../../core/auth/strategies/jwt.strategy';
+import type { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import {
   AssignDepartmentEmployeeDto,
   CreateDepartmentTeamDto,

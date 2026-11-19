@@ -1,4 +1,4 @@
-// File: backend/src/settings/dto/update-branch.dto.ts
+// File: backend/src/settings/organization/dto/update-branch.dto.ts
 
 import {
   IsBoolean,

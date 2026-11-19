@@ -1,6 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../core/prisma/prisma.service';
-import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
+import type { AuthenticatedUser } from '../core/auth/jwt.strategy';
 import { RahcomService } from './rahcom.service';
 
 describe('RahcomService activity access', () => {

@@ -12,14 +12,14 @@ import {
 import { CurrentUser } from '../core/auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../core/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../core/auth/guards/roles.guard';
-import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
+import type { AuthenticatedUser } from '../core/auth/jwt.strategy';
 import { NotificationsService } from './notifications.service';
 import {
   AnnouncementReactionDto,
   CreateAnnouncementCommentDto,
   CreateAnnouncementDto,
   UpdateAnnouncementDto,
-} from './dto/create-announcement.dto';
+} from './create-announcement.dto';
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard, RolesGuard)

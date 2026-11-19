@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AuditAction, Prisma } from '@prisma/client';
 import { performance } from 'node:perf_hooks';
 import { PrismaService } from '../core/prisma/prisma.service';
-import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
+import type { AuthenticatedUser } from '../core/auth/jwt.strategy';
 
 export type RecordActivityInput = {
   organizationId: string;

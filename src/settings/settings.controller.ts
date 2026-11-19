@@ -23,7 +23,7 @@ import { JwtAuthGuard } from '../core/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../core/auth/guards/roles.guard';
 import { CurrentUser } from '../core/auth/decorators/current-user.decorator';
 import { Public } from '../core/auth/decorators/public.decorator';
-import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
+import type { AuthenticatedUser } from '../core/auth/jwt.strategy';
 
 import { SettingsService } from './settings.service';
 
@@ -39,8 +39,8 @@ import { CreateDepartmentDto } from './organization/dto/create-department.dto';
 import { UpdateDepartmentDto } from './organization/dto/update-department.dto';
 
 import { ImportOrganizationDto } from './company/dto/import-organization.dto';
-import { SaveRoleDto } from './roles/dto/save-role.dto';
-import { PublicPresenceDto } from './dto/public-presence.dto';
+import { SaveRoleDto } from './save-role.dto';
+import { PublicPresenceDto } from './public-presence.dto';
 
 @Controller('settings')
 @UseGuards(JwtAuthGuard, RolesGuard)

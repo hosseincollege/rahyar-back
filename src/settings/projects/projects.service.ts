@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
-import type { AuthenticatedUser } from '../../core/auth/strategies/jwt.strategy';
+import type { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import type { ProjectImportItemDto } from './dto/import-projects.dto';
 
 @Injectable()

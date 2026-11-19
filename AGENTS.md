@@ -14,6 +14,7 @@
 - Keep Rahyar API host/port, deployment settings, secrets, database, and migration history independent from ERP. Never reuse ERP connections or data.
 - Preserve Rahyar DATABASE_URL_POOLED handling and main.ts runtime configuration.
 - Inspect this repository Git status and diffs before editing; preserve unrelated work. Do not run migrations unless explicitly requested.
+- Bill identifier assignments support only Rahcom, USO, and VSAT families. Do not add other system families to backend validation or persistence.
 - The user will move project folders. Do not move or rename directories.
 
 ## Rahyar product objective

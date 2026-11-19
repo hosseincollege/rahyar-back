@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { CurrentUser } from '../core/auth/decorators/current-user.decorator';
-import type { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
+import type { AuthenticatedUser } from '../core/auth/jwt.strategy';
 import { DevelopmentService } from './development.service';
-import { UpdateVisitorDeviceLabelDto } from './dto/update-visitor-device-label.dto';
+import { UpdateVisitorDeviceLabelDto } from './update-visitor-device-label.dto';
 
 @Controller('development')
 export class DevelopmentController {

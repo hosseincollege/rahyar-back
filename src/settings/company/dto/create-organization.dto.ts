@@ -1,4 +1,4 @@
-//backend/src/settings/dto/create-organization.dto.ts
+// backend/src/settings/company/dto/create-organization.dto.ts
 
 import {
   IsEmail,

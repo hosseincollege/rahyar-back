@@ -26,8 +26,8 @@ import {
   ImportDepartmentItemDto,
   ImportOrganizationDto,
 } from './company/dto/import-organization.dto';
-import { SaveRoleDto } from './roles/dto/save-role.dto';
-import { AuthenticatedUser } from '../core/auth/strategies/jwt.strategy';
+import { SaveRoleDto } from './save-role.dto';
+import { AuthenticatedUser } from '../core/auth/jwt.strategy';
 import { OrganizationLogoStorageService } from './company/organization-logo-storage.service';
 import { ORGANIZATION_ACCENT_COLORS } from './appearance-palette.backup';
 

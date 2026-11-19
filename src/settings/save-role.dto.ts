@@ -1,4 +1,4 @@
-// File: backend/src/settings/dto/save-role.dto.ts
+// File: backend/src/settings/save-role.dto.ts
 
 import { IsArray, IsOptional, IsString } from 'class-validator';
 

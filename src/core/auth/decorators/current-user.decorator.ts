@@ -6,7 +6,7 @@
 
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
-import type { AuthenticatedUser } from '../strategies/jwt.strategy';
+import type { AuthenticatedUser } from '../jwt.strategy';
 
 export const CurrentUser = createParamDecorator(
   (

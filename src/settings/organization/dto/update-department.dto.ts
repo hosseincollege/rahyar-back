@@ -1,4 +1,4 @@
-// File: backend/src/settings/dto/update-department.dto.ts
+// File: backend/src/settings/organization/dto/update-department.dto.ts
 
 import {
   IsBoolean,

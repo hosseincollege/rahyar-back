@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, type Employee } from '@prisma/client';
 
-import type { AuthenticatedUser } from '../../core/auth/strategies/jwt.strategy';
+import type { AuthenticatedUser } from '../../core/auth/jwt.strategy';
 import { PrismaService } from '../../core/prisma/prisma.service';
 import { SettingsService } from '../settings.service';
 import {

@@ -1,4 +1,4 @@
-// Path: backend/src/settings/dto/create-branch.dto.ts
+// Path: backend/src/settings/organization/dto/create-branch.dto.ts
 
 import {
   IsBoolean,
