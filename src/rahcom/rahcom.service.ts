@@ -1767,8 +1767,10 @@ export class RahcomService {
       );
     }
 
-    const labelCounts = new Map<string, Map<string, number>>();
-    const rowKeys: Array<{ key: string; systemCode: string }> = [];
+    const axisAssignmentsBySystem = new Map<
+      string,
+      { province: string; systemCode: string; axisCode: string; name: string }
+    >();
     const listedSystems = new Set<string>();
     const staticMetadataByKey = new Map<
       string,
@@ -1787,9 +1789,12 @@ export class RahcomService {
       const axisLabel =
         axisNameIndex >= 0 ? cellText(row[axisNameIndex]).trim() : '';
       if (!province || !systemCode) continue;
-      listedSystems.add(`${province}\u0000${systemCode}`);
+      const systemKey = `${province}\u0000${systemCode
+        .normalize('NFKC')
+        .toLocaleUpperCase()}`;
+      listedSystems.add(systemKey);
       if (stationNameIndex >= 0 || aggregationCodeIndex >= 0) {
-        const metadataKey = `${province}\u0000${systemCode.toLocaleUpperCase()}`;
+        const metadataKey = systemKey;
         staticMetadataByKey.set(metadataKey, {
           province,
           systemCode,
@@ -1804,49 +1809,43 @@ export class RahcomService {
         });
       }
       if (!axisCode) continue;
-      const key = `${province}\u0000${axisCode}`;
-      const labels = labelCounts.get(key) ?? new Map<string, number>();
-      if (axisLabel) labels.set(axisLabel, (labels.get(axisLabel) ?? 0) + 1);
-      labelCounts.set(key, labels);
-      rowKeys.push({ key, systemCode });
+      const current = axisAssignmentsBySystem.get(systemKey);
+      if (
+        current &&
+        (current.axisCode !== axisCode ||
+          (current.name && axisLabel && current.name !== axisLabel))
+      ) {
+        throw new BadRequestException(
+          `The traffic list contains conflicting axis data for system ${systemCode}.`,
+        );
+      }
+      axisAssignmentsBySystem.set(systemKey, {
+        province,
+        systemCode,
+        axisCode,
+        name: axisLabel || current?.name || '',
+      });
     }
-    if (!rowKeys.length)
+    if (!axisAssignmentsBySystem.size)
       throw new BadRequestException(
         'No rows with a valid province, system code and axis code were found.',
       );
-
-    const axisNamesByKey = new Map<
-      string,
-      { province: string; axisCode: string; name: string }
-    >();
-    for (const key of labelCounts.keys()) {
-      const separator = key.indexOf('\u0000');
-      const province = key.slice(0, separator);
-      const axisCode = key.slice(separator + 1);
-      const labels = [
-        ...(labelCounts.get(key) ?? new Map<string, number>()).entries(),
-      ].sort(
-        (left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
-      );
-      const sourceName = labels[0]?.[0] ?? `محور ${axisCode}`;
-      const normalizedName = sourceName;
-      axisNamesByKey.set(key, { province, axisCode, name: normalizedName });
-    }
 
     const assignments = new Map<
       string,
       { province: string; axisCode: string; name: string; codes: Set<string> }
     >();
-    for (const { key, systemCode } of rowKeys) {
-      const axis = axisNamesByKey.get(key);
-      if (!axis) continue;
-      const assignmentKey = key;
-      const assignment = assignments.get(assignmentKey) ?? {
-        ...axis,
+    for (const systemAssignment of axisAssignmentsBySystem.values()) {
+      const name = systemAssignment.name || `محور ${systemAssignment.axisCode}`;
+      const assignmentKey = `${systemAssignment.province}\u0000${systemAssignment.axisCode}\u0000${name}`;
+      const axisGroupAssignment = assignments.get(assignmentKey) ?? {
+        province: systemAssignment.province,
+        axisCode: systemAssignment.axisCode,
+        name,
         codes: new Set<string>(),
       };
-      assignment.codes.add(systemCode);
-      assignments.set(assignmentKey, assignment);
+      axisGroupAssignment.codes.add(systemAssignment.systemCode);
+      assignments.set(assignmentKey, axisGroupAssignment);
     }
 
     const updatedSystems = await this.prisma.$transaction(

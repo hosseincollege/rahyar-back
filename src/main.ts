@@ -12,6 +12,13 @@ import { resolve } from 'node:path';
 import { AppModule } from './core/app.module';
 
 const server: Express = express();
+server.disable('x-powered-by');
+server.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
 server.use('/uploads', express.static(resolve(process.cwd(), 'uploads')));
 let initializationPromise: Promise<void> | null = null;
 

@@ -59,7 +59,10 @@ export class SettingsController {
    */
   @Public()
   @Get('public-stats')
-  @Header('Cache-Control', 'no-store, max-age=0')
+  @Header(
+    'Cache-Control',
+    'public, max-age=0, s-maxage=30, stale-while-revalidate=30',
+  )
   async getPublicStats() {
     return this.settingsService.getPublicStats();
   }
@@ -104,7 +107,7 @@ export class SettingsController {
   @Post('organization')
   async createOrganization(
     @Body() dto: CreateOrganizationDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.settingsService.createOrganization(dto, user);
   }

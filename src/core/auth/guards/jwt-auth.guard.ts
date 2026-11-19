@@ -22,6 +22,13 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     ]);
 
     if (isPublic) return true;
+    // GlobalAuthGuard already verified the bearer token before controller
+    // guards run. Reuse its request user instead of querying the user and
+    // organization membership a second time for the same request.
+    const request = context
+      .switchToHttp()
+      .getRequest<{ user?: { id?: string } }>();
+    if (request.user?.id) return true;
     return super.canActivate(context);
   }
 }

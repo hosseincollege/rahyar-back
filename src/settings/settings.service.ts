@@ -455,24 +455,30 @@ export class SettingsService {
     const yearStart = startOfZonedDay(year, 1, 1, now);
     const onlineSince = new Date(now.getTime() - 5 * 60 * 1000);
 
-    const countUniqueVisitorsSince = async (since: Date) => {
-      const [result] = await this.prisma.$queryRaw<Array<{ count: bigint }>>(
-        Prisma.sql`SELECT COUNT(DISTINCT "ipAddress") AS count
-          FROM "visits"
-          WHERE "createdAt" >= ${since}`,
-      );
-      return Number(result?.count ?? 0n);
-    };
-
-    const [daily, weekly, monthly, yearly, online] = await Promise.all([
-      countUniqueVisitorsSince(todayStart),
-      countUniqueVisitorsSince(weekStart),
-      countUniqueVisitorsSince(monthStart),
-      countUniqueVisitorsSince(yearStart),
+    const [visitCounts, online] = await Promise.all([
+      this.prisma.$queryRaw<
+        Array<{
+          daily: bigint;
+          weekly: bigint;
+          monthly: bigint;
+          yearly: bigint;
+        }>
+      >(Prisma.sql`SELECT
+        COUNT(DISTINCT "ipAddress") FILTER (WHERE "createdAt" >= ${todayStart}) AS daily,
+        COUNT(DISTINCT "ipAddress") FILTER (WHERE "createdAt" >= ${weekStart}) AS weekly,
+        COUNT(DISTINCT "ipAddress") FILTER (WHERE "createdAt" >= ${monthStart}) AS monthly,
+        COUNT(DISTINCT "ipAddress") AS yearly
+        FROM "visits"
+        WHERE "createdAt" >= ${yearStart}`),
       this.prisma.visitorPresence.count({
         where: { lastSeenAt: { gte: onlineSince } },
       }),
     ]);
+    const [visitCountsRow] = visitCounts;
+    const daily = Number(visitCountsRow?.daily ?? 0n);
+    const weekly = Number(visitCountsRow?.weekly ?? 0n);
+    const monthly = Number(visitCountsRow?.monthly ?? 0n);
+    const yearly = Number(visitCountsRow?.yearly ?? 0n);
 
     return {
       enabled: true,
@@ -499,11 +505,32 @@ export class SettingsService {
    */
   async trackVisit(ipAddress: string, userAgent?: string) {
     if (!this.isVercelRuntime()) return { success: true, enabled: false };
-    await this.prisma.visit.create({
-      data: {
-        ipAddress: ipAddress.slice(0, 100),
-        userAgent: userAgent ? userAgent.slice(0, 500) : null,
-      },
+    const normalizedIpAddress = ipAddress.slice(0, 100);
+    const now = new Date();
+    const { year, month, day } = zonedDateParts(now);
+    const dayStart = startOfZonedDay(year, month, day, now);
+
+    await this.prisma.$transaction(async (tx) => {
+      // Serialize same-IP visit checks across app instances so concurrent
+      // page requests cannot create duplicate rows for the same Tehran day.
+      await tx.$queryRaw(Prisma.sql`
+        SELECT pg_advisory_xact_lock(hashtextextended(${normalizedIpAddress}, 0))
+      `);
+      const existingVisit = await tx.visit.findFirst({
+        where: {
+          ipAddress: normalizedIpAddress,
+          createdAt: { gte: dayStart },
+        },
+        select: { id: true },
+      });
+      if (existingVisit) return;
+
+      await tx.visit.create({
+        data: {
+          ipAddress: normalizedIpAddress,
+          userAgent: userAgent ? userAgent.slice(0, 500) : null,
+        },
+      });
     });
     return { success: true };
   }
