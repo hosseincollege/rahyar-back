@@ -18,6 +18,7 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import {
+  UpdateRahcomBackupActionsDto,
   UpdateUserPreferencesDto,
   UpdateWorkspaceModeDto,
 } from './dto/update-user-preferences.dto';
@@ -113,5 +114,16 @@ export class AuthController {
       userId,
       dto.workspaceMode as 'FORM' | 'COMMAND' | 'AI',
     );
+  }
+
+  @Put('preferences/rahcom-backup-actions')
+  @UseGuards(JwtAuthGuard)
+  updateRahcomBackupActions(
+    @Req() request: AuthenticatedRequest,
+    @Body() dto: UpdateRahcomBackupActionsDto,
+  ) {
+    const userId = request.user?.id;
+    if (!userId) throw new UnauthorizedException('کاربر احراز هویت نشده است.');
+    return this.authService.updateRahcomBackupActions(userId, dto.open);
   }
 }

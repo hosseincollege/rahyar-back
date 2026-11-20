@@ -503,6 +503,7 @@ export class AuthService {
         lightBrightness: true,
         darkBrightness: true,
         workspaceMode: true,
+        rahcomBackupActionsOpen: true,
       },
     });
   }
@@ -519,7 +520,17 @@ export class AuthService {
         lightBrightness: true,
         darkBrightness: true,
         workspaceMode: true,
+        rahcomBackupActionsOpen: true,
       },
+    });
+  }
+
+  async updateRahcomBackupActions(userId: string, open: boolean) {
+    return this.prisma.userPreference.upsert({
+      where: { userId },
+      create: { userId, rahcomBackupActionsOpen: open },
+      update: { rahcomBackupActionsOpen: open },
+      select: { rahcomBackupActionsOpen: true },
     });
   }
 

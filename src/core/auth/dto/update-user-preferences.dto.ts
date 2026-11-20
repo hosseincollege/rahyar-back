@@ -1,4 +1,4 @@
-import { IsIn, IsString } from 'class-validator';
+import { IsBoolean, IsIn, IsString } from 'class-validator';
 
 const supportedLocales = [
   'fa',
@@ -40,4 +40,9 @@ export class UpdateWorkspaceModeDto {
   @IsString()
   @IsIn(['FORM', 'COMMAND', 'AI'])
   workspaceMode: string;
+}
+
+export class UpdateRahcomBackupActionsDto {
+  @IsBoolean()
+  open: boolean;
 }
