@@ -321,6 +321,13 @@ export class CreateRahcomActivityDto {
   @IsOptional() @IsString() @MaxLength(80) province?: string | null;
 }
 
+export class CreateRahcomInventoryEntryDto {
+  @IsString() @MaxLength(80) @Matches(/^[a-z]+(?:-[a-z]+)*$/) province!: string;
+  @IsString() @MinLength(1) @MaxLength(200) equipmentName!: string;
+  @IsString() @MinLength(1) @MaxLength(100) systemId!: string;
+  @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) usageDate!: string;
+}
+
 export class SaveRahcomDailyWorkflowDto {
   @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) date!: string;
   @IsString() @MinLength(1) @MaxLength(80) province!: string;

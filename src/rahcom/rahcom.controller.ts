@@ -37,6 +37,7 @@ import {
   UpdateRahcomSelectedProvinceDto,
   UpdateRahcomImportedTicketDescriptionDto,
   ReplaceRahcomBillIdentifierListDto,
+  CreateRahcomInventoryEntryDto,
 } from './rahcom.dto';
 import { RahcomService } from './rahcom.service';
 
@@ -219,6 +220,18 @@ export class RahcomController {
     @Query() query: RahcomProvinceQueryDto,
   ) {
     return this.service.getBillIdentifiers(user, query.province);
+  }
+  @Get('inventory')
+  listInventory(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
+    return this.service.listInventory(user, query.province);
+  }
+  @Post('inventory')
+  createInventory(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomInventoryEntryDto) {
+    return this.service.createInventory(user, body);
+  }
+  @Delete('inventory/:id')
+  deleteInventory(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.service.deleteInventory(user, id);
   }
   @Put('bill-identifiers')
   replaceBillIdentifiers(

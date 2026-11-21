@@ -69,6 +69,10 @@ export function rahcomProvinceIdFromLabel(value: string) {
   return provinceIdsByLabel.get(normalizeProvinceLabel(value)) ?? null;
 }
 
+export function rahcomProvinceLabel(value: string) {
+  return provinceLabels[value]?.[0] ?? value;
+}
+
 export function isRahcomProvinceId(value: string) {
   return Object.hasOwn(provinceLabels, value);
 }

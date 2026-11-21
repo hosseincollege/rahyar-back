@@ -27,8 +27,9 @@ import type {
   ReplaceRahcomBillIdentifierListDto,
   RahcomSystemImportRowDto,
   RahcomSystemLookupDto,
+  CreateRahcomInventoryEntryDto,
 } from './rahcom.dto';
-import { isRahcomProvinceId, rahcomProvinceIdFromLabel } from './rahcom-axis';
+import { isRahcomProvinceId, rahcomProvinceIdFromLabel, rahcomProvinceLabel } from './rahcom-axis';
 
 type RahcomAccess = {
   organizationId: string;
@@ -69,6 +70,24 @@ function normalizeBillHeader(value: string): string {
     .replace(/[\u064a\u0649]/g, '\u06cc')
     .replace(/\u0643/g, '\u06a9')
     .replace(/[\s\u200c\u200f/\\_-]/g, '');
+}
+
+function normalizeBillIdentifierWorkbook(province: string, headers: string[], rows: string[][]) {
+  if (headers.length === 0) return { headers, rows };
+  const provinceHeader = normalizeBillHeader('\u0627\u0633\u062a\u0627\u0646');
+  let provinceIndex = headers.findIndex((header) => normalizeBillHeader(header) === provinceHeader);
+  const normalizedHeaders = [...headers];
+  if (provinceIndex < 0) {
+    provinceIndex = normalizedHeaders.length;
+    normalizedHeaders.push('\u0627\u0633\u062a\u0627\u0646');
+  }
+  const provinceName = rahcomProvinceLabel(province);
+  const normalizedRows = rows.map((row) => {
+    const normalizedRow = Array.from({ length: normalizedHeaders.length }, (_, index) => row[index] ?? '');
+    normalizedRow[provinceIndex] = provinceName;
+    return normalizedRow;
+  });
+  return { headers: normalizedHeaders, rows: normalizedRows };
 }
 
 function normalizeBillIdentifier(value: string): string {
@@ -362,6 +381,40 @@ export class RahcomService {
       lt: new Date(start.getTime() + 86_400_000 - offset),
     };
   }
+  async listInventory(user: AuthenticatedUser, requestedProvince?: string) {
+    const access = await this.authorize(user);
+    const province = this.scopedProvince(access, requestedProvince);
+    return this.prisma.rahcomInventoryEntry.findMany({
+      where: { organizationId: access.organizationId, ...(province ? { province } : {}) },
+      orderBy: [{ usageDate: 'desc' }, { createdAt: 'desc' }],
+    });
+  }
+  async createInventory(user: AuthenticatedUser, body: CreateRahcomInventoryEntryDto) {
+    const access = await this.authorize(user, true);
+    const province = this.scopedProvince(access, body.province);
+    if (!province) throw new BadRequestException('Select a province.');
+    const system = await this.prisma.rahcomSystem.findFirst({
+      where: { id: body.systemId, organizationId: access.organizationId, province },
+      select: { id: true, systemName: true, systemCode: true },
+    });
+    if (!system) throw new NotFoundException('Rahcom system not found in this province.');
+    const usageDate = new Date(`${body.usageDate}T00:00:00.000Z`);
+    if (Number.isNaN(usageDate.getTime()) || usageDate.toISOString().slice(0, 10) !== body.usageDate)
+      throw new BadRequestException('Invalid usage date.');
+    return this.prisma.rahcomInventoryEntry.create({ data: {
+      organizationId: access.organizationId, createdById: user.id, province,
+      equipmentName: body.equipmentName.trim(), systemId: system.id,
+      systemNameSnapshot: system.systemName, systemCodeSnapshot: system.systemCode, usageDate,
+    } });
+  }
+  async deleteInventory(user: AuthenticatedUser, id: string) {
+    const access = await this.authorize(user, true);
+    const entry = await this.prisma.rahcomInventoryEntry.findFirst({ where: { id, organizationId: access.organizationId } });
+    if (!entry) throw new NotFoundException('Inventory entry not found.');
+    this.scopedProvince(access, entry.province);
+    await this.prisma.rahcomInventoryEntry.delete({ where: { id } });
+    return { deleted: true };
+  }
   async listSystems(user: AuthenticatedUser, province?: string) {
     const access = await this.authorize(user);
     const selectedProvince = this.scopedProvince(access, province);
@@ -492,7 +545,13 @@ export class RahcomService {
       },
       select: { headers: true, rows: true, updatedAt: true },
     });
-    return list ?? { headers: [], rows: [], updatedAt: null };
+    if (!list) return { headers: [], rows: [], updatedAt: null };
+    const normalized = normalizeBillIdentifierWorkbook(
+      province,
+      jsonArray(list.headers).map(cellText),
+      jsonRows(list.rows).map((row) => row.map(cellText)),
+    );
+    return { ...normalized, updatedAt: list.updatedAt };
   }
   async replaceBillIdentifiers(
     user: AuthenticatedUser,
@@ -518,8 +577,14 @@ export class RahcomService {
         'Bill identifier rows must contain text values within the column count.',
       );
     }
-    const headers = body.headers.map((header) => header.trim());
-    if (headers.some((header) => !header || header.length > 120))
+    const normalizedWorkbook = normalizeBillIdentifierWorkbook(
+      province,
+      body.headers.map((header) => header.trim()),
+      body.rows,
+    );
+    const rows = normalizedWorkbook.rows;
+    const headers = normalizedWorkbook.headers;
+    if (headers.length > 100 || headers.some((header) => !header || header.length > 120))
       throw new BadRequestException('Bill identifier headers are invalid.');
     const normalizedHeaders = headers.map(normalizeBillHeader);
     if (new Set(normalizedHeaders).size !== normalizedHeaders.length)
@@ -527,7 +592,7 @@ export class RahcomService {
     const systemCodeColumn = normalizedHeaders.findIndex((header) => ['\u06a9\u062f\u0633\u0627\u0645\u0627\u0646\u0647', '\u06a9\u062f\u0633\u06cc\u0633\u062a\u0645'].includes(header));
     if (
       systemCodeColumn >= 0 &&
-      body.rows.some((row) =>
+      rows.some((row) =>
         hasMixedBillSystemFamilies(row[systemCodeColumn] ?? ''),
       )
     )
@@ -538,7 +603,7 @@ export class RahcomService {
     if (billIdentifierColumn < 0)
       throw new BadRequestException('A bill identifier column is required.');
     const seenBillIdentifiers = new Set<string>();
-    for (const row of body.rows) {
+    for (const row of rows) {
       const billIdentifier = normalizeBillIdentifier(
         row[billIdentifierColumn] ?? '',
       );
@@ -550,7 +615,7 @@ export class RahcomService {
     const linkedBillBySystem = new Map<string, string>();
     const relatedSystemCodes = new Set<string>();
     if (systemCodeColumn >= 0) {
-      for (const row of body.rows) {
+      for (const row of rows) {
         const billId = normalizeBillIdentifier(row[billIdentifierColumn] ?? '');
         for (const code of (row[systemCodeColumn] ?? '').split(/[;,|]/).map((item) => item.trim()).filter(Boolean)) {
           if (/^EXTERNAL:/i.test(code)) continue;
@@ -579,8 +644,8 @@ export class RahcomService {
       }
       const saved = await tx.rahcomBillIdentifierList.upsert({
         where: { organizationId_province: { organizationId: access.organizationId, province } },
-        create: { organizationId: access.organizationId, province, headers, rows: body.rows, updatedById: user.id },
-        update: { headers, rows: body.rows, updatedById: user.id },
+        create: { organizationId: access.organizationId, province, headers, rows, updatedById: user.id },
+        update: { headers, rows, updatedById: user.id },
         select: { headers: true, rows: true, updatedAt: true },
       });
       for (const systemCode of relatedSystemCodes) {

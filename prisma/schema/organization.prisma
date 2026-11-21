@@ -52,6 +52,7 @@ model Organization {
   rahcomImportedTickets RahcomImportedTicket[]
   rahcomRoadLists     RahcomRoadList[]
   rahcomBillIdentifierLists RahcomBillIdentifierList[]
+  rahcomInventoryEntries RahcomInventoryEntry[]
 
   @@index([installationId])
   @@index([status])
