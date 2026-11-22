@@ -5,8 +5,6 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../core/prisma/prisma.service';
 import type { AuthenticatedUser } from '../core/auth/jwt.strategy';
@@ -25,6 +23,7 @@ import type {
   UpdateRahcomSystemDto,
   SaveRahcomDailyWorkflowDto,
   ReplaceRahcomBillIdentifierListDto,
+  ReplaceRahcomSitesListDto,
   RahcomSystemImportRowDto,
   RahcomSystemLookupDto,
   CreateRahcomInventoryEntryDto,
@@ -41,11 +40,7 @@ type RahcomAccess = {
   selectedProvince: string | null;
 };
 
-type RahcomSitesWorkbook = Array<{ name: string; rows: string[][] }>;
 const excludedIsfahanSystemCode = '065P63087';
-const rahcomSitesWorkbook = JSON.parse(
-  readFileSync(join(__dirname, 'data', 'uso-sites.json'), 'utf8'),
-) as RahcomSitesWorkbook;
 
 function cellText(value: unknown): string {
   if (typeof value === 'string') return value;
@@ -259,62 +254,51 @@ export class RahcomService {
   async listSites(user: AuthenticatedUser, requestedProvince?: string) {
     const access = await this.authorize(user);
     const province = this.scopedProvince(access, requestedProvince);
-    const source = rahcomSitesWorkbook.find(
-      (sheet: { name: string }) => sheet.name === 'All Sites',
-    );
-    if (!source) return [];
-    const headers = source.rows[0] ?? [];
-    const normalizedHeaders = headers.map(normalizeBillHeader);
-    const codeIndex = normalizedHeaders.findIndex((header) =>
-      [
-        '\u06a9\u062f\u0633\u0627\u06cc\u062a',
-        '\u06a9\u062f\u0633\u0627\u06cc\u062a\u0627\u0648\u0644\u06cc\u0647',
-      ].includes(header),
-    );
-    const finalCodeIndex = normalizedHeaders.findIndex(
-      (header) =>
-        header ===
-        '\u06a9\u062f\u0633\u0627\u06cc\u062a\u0646\u0647\u0627\u06cc\u06cc',
-    );
-    const siteNameIndex = normalizedHeaders.findIndex(
-      (header) => header === '\u0646\u0627\u0645\u0633\u0627\u06cc\u062a',
-    );
-    const provinceIndex = normalizedHeaders.findIndex(
-      (header) => header === '\u0627\u0633\u062a\u0627\u0646',
-    );
-    const ownershipIndex = normalizedHeaders.findIndex((header) =>
-      header.includes('\u0645\u0627\u0644\u06a9\u06cc\u062a'),
-    );
-    if (
-      codeIndex < 0 ||
-      finalCodeIndex < 0 ||
-      siteNameIndex < 0 ||
-      provinceIndex < 0 ||
-      ownershipIndex < 0
-    )
-      return [];
-    const outputHeaders = [
-      headers[siteNameIndex],
-      headers[codeIndex],
-      headers[finalCodeIndex],
-      headers[provinceIndex],
-      headers[ownershipIndex],
-    ];
-    const rows = source.rows.slice(1).flatMap((row: string[]) => {
-      const label = row[provinceIndex]?.trim();
-      if (province && rahcomProvinceIdFromLabel(label ?? '') !== province)
-        return [];
-      return [
-        [
-          row[siteNameIndex] ?? '',
-          row[codeIndex] ?? '',
-          row[finalCodeIndex] ?? '',
-          label ?? '',
-          row[ownershipIndex] ?? '',
-        ],
-      ];
+    const lists = await this.prisma.rahcomSitesList.findMany({
+      where: { organizationId: access.organizationId, ...(province ? { province } : {}) },
+      orderBy: { province: 'asc' },
+      select: { headers: true, rows: true },
     });
-    return [{ name: 'All Sites', rows: [outputHeaders, ...rows] }];
+    if (!lists.length) return [];
+    const headers = jsonArray(lists[0].headers).map(cellText);
+    let typeIndex = headers.findIndex((header) => normalizeBillHeader(header) === normalizeBillHeader('\u0646\u0648\u0639 \u0633\u0627\u06cc\u062a'));
+    if (typeIndex < 0) {
+      typeIndex = headers.length;
+      headers.push('\u0646\u0648\u0639 \u0633\u0627\u06cc\u062a');
+    }
+    const rows = lists.flatMap((list) => {
+      const sourceHeaders = jsonArray(list.headers).map(cellText);
+      const sourceHeaderIndexes = headers.map((header) =>
+        sourceHeaders.findIndex((sourceHeader) => normalizeBillHeader(sourceHeader) === normalizeBillHeader(header)),
+      );
+      return jsonRows(list.rows).map((value) => {
+        const row = sourceHeaderIndexes.map((sourceIndex) => sourceIndex < 0 ? '' : cellText(value[sourceIndex]));
+        if (!row[typeIndex]) row[typeIndex] = 'USO';
+        return row;
+      });
+    });
+    return [{ name: 'All Sites', rows: [headers, ...rows] }];
+  }
+  async replaceSites(user: AuthenticatedUser, body: ReplaceRahcomSitesListDto) {
+    const access = await this.authorize(user, true);
+    const province = this.scopedProvince(access, body.province);
+    if (!province) throw new BadRequestException('Select a single province to save sites.');
+    if (body.headers.length < 2 || body.headers.some((header) => !header.trim() || header.length > 120))
+      throw new BadRequestException('Site headers are invalid.');
+    if (body.rows.some((row) => !Array.isArray(row) || row.length > body.headers.length || row.some((value) => typeof value !== 'string' || value.length > 2000)))
+      throw new BadRequestException('Site rows must contain text values within the column count.');
+    const normalizedHeaders = body.headers.map(normalizeBillHeader);
+    if (new Set(normalizedHeaders).size !== normalizedHeaders.length)
+      throw new BadRequestException('Site headers must be unique.');
+    const serializedSize = Buffer.byteLength(JSON.stringify({ headers: body.headers, rows: body.rows }), 'utf8');
+    if (serializedSize > 10 * 1024 * 1024) throw new BadRequestException('Site list exceeds the 10 MB limit.');
+    const saved = await this.prisma.rahcomSitesList.upsert({
+      where: { organizationId_province: { organizationId: access.organizationId, province } },
+      create: { organizationId: access.organizationId, province, headers: body.headers, rows: body.rows, updatedById: user.id },
+      update: { headers: body.headers, rows: body.rows, updatedById: user.id },
+      select: { updatedAt: true },
+    });
+    return { saved: true, province, updatedAt: saved.updatedAt };
   }
   async getRahcomAccess(user: AuthenticatedUser) {
     const access = await this.authorize(user);

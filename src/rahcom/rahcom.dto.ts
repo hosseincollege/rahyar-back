@@ -300,6 +300,12 @@ export class ReplaceRahcomBillIdentifierListDto {
   @IsArray() @ArrayMaxSize(20000) rows!: string[][];
 }
 
+export class ReplaceRahcomSitesListDto {
+  @IsString() @MaxLength(80) @Matches(/^[a-z]+(?:-[a-z]+)*$/) province!: string;
+  @IsArray() @ArrayMinSize(2) @ArrayMaxSize(100) @IsString({ each: true }) headers!: string[];
+  @IsArray() @ArrayMaxSize(10000) rows!: string[][];
+}
+
 export class UpdateRahcomMemberProvinceDto {
   @IsOptional() @IsString() @MaxLength(80) province?: string | null;
 }

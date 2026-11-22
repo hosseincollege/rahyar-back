@@ -37,6 +37,7 @@ import {
   UpdateRahcomSelectedProvinceDto,
   UpdateRahcomImportedTicketDescriptionDto,
   ReplaceRahcomBillIdentifierListDto,
+  ReplaceRahcomSitesListDto,
   CreateRahcomInventoryEntryDto,
 } from './rahcom.dto';
 import { RahcomService } from './rahcom.service';
@@ -70,6 +71,13 @@ export class RahcomController {
     @Query() query: RahcomProvinceQueryDto,
   ) {
     return this.service.listSites(user, query.province);
+  }
+  @Put('sites')
+  replaceSites(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: ReplaceRahcomSitesListDto,
+  ) {
+    return this.service.replaceSites(user, body);
   }
   @Get('systems/search')
   searchSystems(
