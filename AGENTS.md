@@ -21,4 +21,5 @@
 
 - Build an independent multi-province system monitoring and fault management service. Authorized users must be able to find systems in their assigned province, understand failures, record repair work, and coordinate maintenance.
 - During audits, follow each workflow end to end across UI, API, authorization, and persistence. Verify organization and province scoping for every read, write, import, export, and aggregate; never infer access from client-supplied province values alone.
+- **Rahcom province prerequisite:** Every Rahcom data operation requires at least one active organization branch mapped to a supported Rahcom province and the current user must either have a province assignment or explicitly select one in the top header. A single configured province must never be auto-selected. `/rahcom/me` may return the configured province IDs and access state for the selector; all other Rahcom operations must enforce both the user's province eligibility and organization scope.
 - Keep the Rahyar product surface limited to Rahcom, Settings, and Development. Do not restore ERP business modules or ERP-specific roadmap assumptions.

@@ -38,6 +38,8 @@ type RahcomAccess = {
   isAdmin: boolean;
   province: string | null;
   selectedProvince: string | null;
+  provinces: string[];
+  hasProvinceAccess: boolean;
 };
 
 const excludedIsfahanSystemCode = '065P63087';
@@ -141,11 +143,31 @@ export class RahcomService {
       throw new BadRequestException('No active organization is selected.');
     return user.organizationId;
   }
+  private async organizationProvinces(organizationId: string) {
+    const branches = await this.prisma.branch.findMany({
+      where: { organizationId, isActive: true },
+      select: { code: true, name: true },
+    });
+    const provinces = branches.flatMap(({ code, name }) => {
+      const codeProvince = code.match(/^DEMO-PROVINCE-(.+)$/i)?.[1]?.toLowerCase();
+      const province = codeProvince && isRahcomProvinceId(codeProvince)
+        ? codeProvince
+        : rahcomProvinceIdFromLabel(name);
+      return province ? [province] : [];
+    });
+    return [...new Set(provinces)];
+  }
   private async authorize(
     user: AuthenticatedUser,
     write: boolean | 'activity' = false,
+    allowNoProvince = false,
   ): Promise<RahcomAccess> {
     const organizationId = this.organization(user);
+    const provinces = await this.organizationProvinces(organizationId);
+    if (!allowNoProvince && provinces.length === 0)
+      throw new ForbiddenException(
+        'Create at least one active province in organization settings before using Rahcom.',
+      );
     const membership = await this.prisma.organizationMember.findFirst({
       where: {
         organizationId,
@@ -181,6 +203,16 @@ export class RahcomService {
         throw new ForbiddenException(
           'An active organization membership is required.',
         );
+      const preference = await this.prisma.userPreference.findUnique({
+        where: { userId: user.id },
+        select: { rahcomSelectedProvince: true },
+      });
+      const selectedProvince = preference?.rahcomSelectedProvince ?? null;
+      const hasProvinceAccess = provinces.includes(selectedProvince ?? '');
+      if (!allowNoProvince && !hasProvinceAccess)
+        throw new ForbiddenException(
+          'Select a configured province in the Rahcom header before using Rahcom.',
+        );
       return {
         organizationId,
         memberId: null,
@@ -188,7 +220,9 @@ export class RahcomService {
         provinceViewer: false,
         isAdmin: true,
         province: null,
-        selectedProvince: 'isfahan',
+        selectedProvince: hasProvinceAccess ? selectedProvince : null,
+        provinces,
+        hasProvinceAccess,
       };
     }
     const roles = membership.roles.map(({ role }) => role);
@@ -211,9 +245,19 @@ export class RahcomService {
       : provinceViewer
         ? null
         : membership.rahcomProvince;
-    if (!isAdmin && !demoOnly && !provinceViewer && !province)
+    const assignedProvince = province && provinces.includes(province) ? province : null;
+    const requestedSelection = membership.rahcomSelectedProvince;
+    const selectedProvince = demoOnly
+      ? 'isfahan'
+      : requestedSelection && requestedSelection !== 'all' && provinces.includes(requestedSelection)
+        ? requestedSelection
+        : assignedProvince;
+    const hasProvinceAccess = demoOnly
+      ? provinces.includes('isfahan')
+      : Boolean(selectedProvince);
+    if (!allowNoProvince && !hasProvinceAccess)
       throw new ForbiddenException(
-        'An administrator must assign your Rahcom province before access is granted.',
+        'Select a configured province in the Rahcom header or ask an administrator to assign your province.',
       );
     return {
       organizationId,
@@ -221,18 +265,19 @@ export class RahcomService {
       demoOnly,
       provinceViewer,
       isAdmin,
-      province,
-      selectedProvince: demoOnly
-        ? 'isfahan'
-        : (membership.rahcomSelectedProvince ??
-          (provinceViewer ? 'all' : 'isfahan')),
+      province: assignedProvince,
+      provinces,
+      selectedProvince,
+      hasProvinceAccess,
     };
   }
   private scopedProvince(access: RahcomAccess, requested?: string | null) {
     const province = String(
-      requested ?? (access.isAdmin ? access.selectedProvince : '') ?? '',
+      requested ?? (access.isAdmin || access.provinceViewer ? access.selectedProvince : '') ?? '',
     ).trim();
     if (access.demoOnly) {
+      if (!access.provinces.includes('isfahan'))
+        throw new ForbiddenException('Isfahan must exist in organization settings before using Rahcom.');
       if (province && province !== 'isfahan')
         throw new ForbiddenException(
           'Demo accounts can only access Isfahan Rahcom data.',
@@ -241,10 +286,12 @@ export class RahcomService {
     }
     if (province && province !== 'all' && !isRahcomProvinceId(province))
       throw new BadRequestException('Choose a supported province.');
+    if (province && province !== 'all' && !access.provinces.includes(province))
+      throw new ForbiddenException('Choose a province configured in organization settings.');
     if (access.provinceViewer)
       return !province || province === 'all' ? undefined : province;
     if (access.isAdmin)
-      return !province || province === 'all' ? undefined : province;
+      return !province || province === 'all' ? access.province ?? undefined : province;
     if (province && province !== access.province)
       throw new ForbiddenException(
         'You can only access Rahcom data for your assigned province.',
@@ -301,7 +348,7 @@ export class RahcomService {
     return { saved: true, province, updatedAt: saved.updatedAt };
   }
   async getRahcomAccess(user: AuthenticatedUser) {
-    const access = await this.authorize(user);
+    const access = await this.authorize(user, false, true);
     return {
       memberId: access.memberId,
       province: access.province,
@@ -316,15 +363,16 @@ export class RahcomService {
       canRecordActivities:
         !access.demoOnly &&
         !access.provinceViewer &&
-        (access.isAdmin || Boolean(access.province)),
+        (access.isAdmin || Boolean(access.province || access.selectedProvince)),
+      provinces: access.provinces,
+      hasProvinceAccess: access.hasProvinceAccess,
     };
   }
   async updateSelectedProvince(user: AuthenticatedUser, province: string) {
-    const access = await this.authorize(user);
+    const access = await this.authorize(user, false, true);
     if (
       (!access.isAdmin && !access.provinceViewer) ||
-      access.demoOnly ||
-      !access.memberId
+      access.demoOnly
     )
       throw new ForbiddenException(
         'This account cannot choose the Rahcom province view.',
@@ -332,6 +380,16 @@ export class RahcomService {
     const normalized = String(province ?? '').trim();
     if (normalized !== 'all' && !isRahcomProvinceId(normalized))
       throw new BadRequestException('Choose a supported province.');
+    if (normalized !== 'all' && !access.provinces.includes(normalized))
+      throw new ForbiddenException('Choose a province configured in organization settings.');
+    if (!access.memberId) {
+      await this.prisma.userPreference.upsert({
+        where: { userId: user.id },
+        create: { userId: user.id, rahcomSelectedProvince: normalized === 'all' ? null : normalized },
+        update: { rahcomSelectedProvince: normalized === 'all' ? null : normalized },
+      });
+      return { rahcomSelectedProvince: normalized };
+    }
     const updated = await this.prisma.organizationMember.updateMany({
       where: {
         id: access.memberId,
