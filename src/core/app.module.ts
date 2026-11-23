@@ -12,6 +12,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { SetupModule } from './setup/setup.module';
 import { SettingsModule } from '../settings/settings.module';
 import { RahcomModule } from '../rahcom/rahcom.module';
+import { BusinessTripsModule } from '../business-trips/business-trips.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { RahcomModule } from '../rahcom/rahcom.module';
     SettingsModule,
     DevelopmentModule,
     RahcomModule,
+    BusinessTripsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
