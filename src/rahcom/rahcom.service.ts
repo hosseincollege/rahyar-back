@@ -28,10 +28,13 @@ import type {
   ReplaceRahcomBillIdentifierListDto,
   ReplaceRahcomSitesListDto,
   ReplaceRahcomMissionListDto,
+  ReplaceRahcomInvoiceListDto,
   SaveRahcomMissionDefaultsDto,
   RahcomSystemImportRowDto,
   RahcomSystemLookupDto,
   CreateRahcomInventoryEntryDto,
+  CreateRahcomInventoryRequestDto,
+  UpdateRahcomInventoryRequestDto,
 } from './rahcom.dto';
 import { isRahcomProvinceId, rahcomProvinceIdFromLabel, rahcomProvinceLabel } from './rahcom-axis';
 
@@ -815,6 +818,49 @@ export class RahcomService {
       orderBy: [{ usageDate: 'desc' }, { createdAt: 'desc' }],
     });
   }
+  async listInventoryRequests(user: AuthenticatedUser, requestedProvince?: string) {
+    const access = await this.authorize(user);
+    const province = this.scopedProvince(access, requestedProvince);
+    return this.prisma.rahcomInventoryRequest.findMany({
+      where: { organizationId: access.organizationId, ...(province ? { province } : {}) },
+      orderBy: [{ requestedAtText: 'desc' }, { referenceNumber: 'desc' }],
+    });
+  }
+  async createInventoryRequest(user: AuthenticatedUser, body: CreateRahcomInventoryRequestDto) {
+    const access = await this.authorize(user, true);
+    const province = this.scopedProvince(access, body.province);
+    if (!province) throw new BadRequestException('Select a province.');
+    if (Buffer.byteLength(JSON.stringify(body.items), 'utf8') > 100_000)
+      throw new BadRequestException('Request items are too large.');
+    return this.prisma.rahcomInventoryRequest.upsert({
+      where: { organizationId_referenceNumber: { organizationId: access.organizationId, referenceNumber: body.referenceNumber.trim() } },
+      create: {
+        organizationId: access.organizationId, createdById: user.id, province,
+        referenceNumber: body.referenceNumber.trim(), requestedAtText: body.requestedAtText.trim(),
+        requestDescription: body.requestDescription.trim(), items: body.items as Prisma.InputJsonValue,
+      },
+      update: {},
+    });
+  }
+  async updateInventoryRequest(user: AuthenticatedUser, id: string, body: UpdateRahcomInventoryRequestDto) {
+    const access = await this.authorize(user, true);
+    const existing = await this.prisma.rahcomInventoryRequest.findFirst({ where: { id, organizationId: access.organizationId } });
+    if (!existing) throw new NotFoundException('Inventory request not found.');
+    this.scopedProvince(access, existing.province);
+    if (body.status === 'DELIVERED' && !['REQUESTED', 'DELIVERED'].includes(existing.status)) throw new BadRequestException('Invalid inventory request stage.');
+    if (body.status === 'CONSUMED' && !['DELIVERED', 'CONSUMED'].includes(existing.status)) throw new BadRequestException('The request must be delivered before consumption.');
+    if (body.status === 'REQUESTED' && existing.status !== 'REQUESTED') throw new BadRequestException('Completed stages cannot be rolled back.');
+    if (body.status === 'DELIVERED' && !body.deliveryDate?.trim()) throw new BadRequestException('Delivery date is required.');
+    if (body.status === 'CONSUMED' && !body.consumptionDate?.trim()) throw new BadRequestException('Consumption date is required.');
+    const update: Prisma.RahcomInventoryRequestUpdateInput = { status: body.status };
+    if (body.deliveryDate !== undefined) update.deliveryDate = body.deliveryDate;
+    if (body.deliveryNote !== undefined) update.deliveryNote = body.deliveryNote;
+    if (body.deliveredItems !== undefined) update.deliveredItems = body.deliveredItems as Prisma.InputJsonValue;
+    if (body.consumptionDate !== undefined) update.consumptionDate = body.consumptionDate;
+    if (body.consumptionNote !== undefined) update.consumptionNote = body.consumptionNote;
+    if (body.consumedItems !== undefined) update.consumedItems = body.consumedItems as Prisma.InputJsonValue;
+    return this.prisma.rahcomInventoryRequest.update({ where: { id }, data: update });
+  }
   async createInventory(user: AuthenticatedUser, body: CreateRahcomInventoryEntryDto) {
     const access = await this.authorize(user, true);
     const province = this.scopedProvince(access, body.province);
@@ -1009,6 +1055,26 @@ export class RahcomService {
       rows: jsonRows(list.rows).map((row) => row.map(cellText)),
       updatedAt: list.updatedAt,
     };
+  }
+  async replaceInvoices(user: AuthenticatedUser, body: ReplaceRahcomInvoiceListDto) {
+    const access = await this.authorize(user, true);
+    const province = this.scopedProvince(access, body.province);
+    if (province !== 'isfahan') throw new BadRequestException('Invoice backup restore is only available for Isfahan.');
+    if (body.headers.length < 2 || body.headers.some((header) => !header.trim() || header.length > 120))
+      throw new BadRequestException('Invoice headers are invalid.');
+    if (new Set(body.headers.map(normalizeBillHeader)).size !== body.headers.length)
+      throw new BadRequestException('Invoice headers must be unique.');
+    if (body.rows.some((row) => !Array.isArray(row) || row.length !== body.headers.length || row.some((value) => typeof value !== 'string' || value.length > 10000)))
+      throw new BadRequestException('Invoice rows must contain text values matching the column count.');
+    const serializedSize = Buffer.byteLength(JSON.stringify({ headers: body.headers, rows: body.rows }), 'utf8');
+    if (serializedSize > 10 * 1024 * 1024) throw new BadRequestException('Invoice list exceeds the 10 MB limit.');
+    const saved = await this.prisma.rahcomInvoiceList.upsert({
+      where: { organizationId_province: { organizationId: access.organizationId, province } },
+      create: { organizationId: access.organizationId, province, headers: body.headers, rows: body.rows, updatedById: user.id },
+      update: { headers: body.headers, rows: body.rows, updatedById: user.id },
+      select: { updatedAt: true },
+    });
+    return { saved: true, province, headers: body.headers, rows: body.rows, updatedAt: saved.updatedAt };
   }
   async getInvoiceAttachments(user: AuthenticatedUser, requestedProvince?: string) {
     const access = await this.authorize(user);

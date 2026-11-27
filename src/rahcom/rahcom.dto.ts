@@ -314,6 +314,12 @@ export class ReplaceRahcomMissionListDto {
   @IsArray() @ArrayMaxSize(10000) rows!: string[][];
 }
 
+export class ReplaceRahcomInvoiceListDto {
+  @IsString() @MaxLength(80) @Matches(/^[a-z]+(?:-[a-z]+)*$/) province!: string;
+  @IsArray() @ArrayMinSize(2) @ArrayMaxSize(100) @IsString({ each: true }) headers!: string[];
+  @IsArray() @ArrayMaxSize(20000) rows!: string[][];
+}
+
 export class SaveRahcomMissionDefaultsDto {
   @IsString() @MaxLength(80) @Matches(/^[a-z]+(?:-[a-z]+)*$/) province!: string;
   @IsString() @MinLength(1) @MaxLength(100) requestType!: string;
@@ -349,6 +355,24 @@ export class CreateRahcomInventoryEntryDto {
   @IsString() @MinLength(1) @MaxLength(200) equipmentName!: string;
   @IsString() @MinLength(1) @MaxLength(100) systemId!: string;
   @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) usageDate!: string;
+}
+
+export class CreateRahcomInventoryRequestDto {
+  @IsString() @MaxLength(80) @Matches(/^[a-z]+(?:-[a-z]+)*$/) province!: string;
+  @IsString() @MinLength(1) @MaxLength(40) referenceNumber!: string;
+  @IsString() @MinLength(1) @MaxLength(80) requestedAtText!: string;
+  @IsString() @MinLength(1) @MaxLength(10000) requestDescription!: string;
+  @IsArray() @ArrayMaxSize(100) items!: Array<Record<string, unknown>>;
+}
+
+export class UpdateRahcomInventoryRequestDto {
+  @IsIn(['REQUESTED', 'DELIVERED', 'CONSUMED']) status!: string;
+  @IsOptional() @IsString() @MaxLength(80) deliveryDate?: string;
+  @IsOptional() @IsString() @MaxLength(10000) deliveryNote?: string;
+  @IsOptional() @IsArray() @ArrayMaxSize(100) deliveredItems?: Array<Record<string, unknown>>;
+  @IsOptional() @IsString() @MaxLength(80) consumptionDate?: string;
+  @IsOptional() @IsString() @MaxLength(10000) consumptionNote?: string;
+  @IsOptional() @IsArray() @ArrayMaxSize(100) consumedItems?: Array<Record<string, unknown>>;
 }
 
 export class SaveRahcomDailyWorkflowDto {

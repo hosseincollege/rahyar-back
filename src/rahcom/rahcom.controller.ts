@@ -43,8 +43,11 @@ import {
   ReplaceRahcomBillIdentifierListDto,
   ReplaceRahcomSitesListDto,
   ReplaceRahcomMissionListDto,
+  ReplaceRahcomInvoiceListDto,
   SaveRahcomMissionDefaultsDto,
   CreateRahcomInventoryEntryDto,
+  CreateRahcomInventoryRequestDto,
+  UpdateRahcomInventoryRequestDto,
 } from './rahcom.dto';
 import { RahcomService } from './rahcom.service';
 
@@ -264,6 +267,13 @@ export class RahcomController {
   ) {
     return this.service.getInvoices(user, query.province);
   }
+  @Put('invoices')
+  replaceInvoices(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: ReplaceRahcomInvoiceListDto,
+  ) {
+    return this.service.replaceInvoices(user, body);
+  }
   @Get('invoice-attachments')
   getInvoiceAttachments(
     @CurrentUser() user: AuthenticatedUser,
@@ -308,6 +318,18 @@ export class RahcomController {
   @Delete('inventory/:id')
   deleteInventory(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.service.deleteInventory(user, id);
+  }
+  @Get('inventory-requests')
+  listInventoryRequests(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
+    return this.service.listInventoryRequests(user, query.province);
+  }
+  @Post('inventory-requests')
+  createInventoryRequest(@CurrentUser() user: AuthenticatedUser, @Body() body: CreateRahcomInventoryRequestDto) {
+    return this.service.createInventoryRequest(user, body);
+  }
+  @Put('inventory-requests/:id')
+  updateInventoryRequest(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() body: UpdateRahcomInventoryRequestDto) {
+    return this.service.updateInventoryRequest(user, id, body);
   }
   @Put('bill-identifiers')
   replaceBillIdentifiers(

@@ -56,6 +56,7 @@ model Organization {
   rahcomMissionLists   RahcomMissionList[]
   rahcomMissionDefaults RahcomMissionDefaults[]
   rahcomInventoryEntries RahcomInventoryEntry[]
+  rahcomInventoryRequests RahcomInventoryRequest[]
   rahcomInvoiceLists   RahcomInvoiceList[]
   rahcomInvoiceAttachments RahcomInvoiceAttachment[]
 

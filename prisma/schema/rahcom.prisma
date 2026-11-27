@@ -279,3 +279,28 @@ model RahcomInventoryEntry {
   @@index([organizationId, systemId, usageDate])
   @@map("rahcom_inventory_entries")
 }
+
+model RahcomInventoryRequest {
+  id                 String       @id @default(cuid())
+  organizationId     String
+  createdById        String
+  province           String       @db.VarChar(80)
+  referenceNumber    String       @db.VarChar(40)
+  requestedAtText    String       @db.VarChar(80)
+  requestDescription String       @db.Text
+  items              Json         @db.JsonB
+  status             String       @default("REQUESTED") @db.VarChar(20)
+  deliveryDate       String?      @db.VarChar(80)
+  deliveryNote       String?      @db.Text
+  deliveredItems     Json?        @db.JsonB
+  consumptionDate    String?      @db.VarChar(80)
+  consumptionNote    String?      @db.Text
+  consumedItems      Json?        @db.JsonB
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, referenceNumber])
+  @@index([organizationId, province, status])
+  @@map("rahcom_inventory_requests")
+}
