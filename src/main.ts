@@ -26,6 +26,10 @@ const allowedOrigins = [
   'https://rahyar-front.vercel.app',
   'http://localhost:3015',
   'http://127.0.0.1:3015',
+  'http://localhost:3115',
+  'http://127.0.0.1:3115',
+  'https://rahyar-erp.ir',
+  'https://www.rahyar-erp.ir',
   ...(process.env.RAHYAR_FRONTEND_ORIGINS ?? '')
     .split(',')
     .map((origin) => origin.trim())
@@ -89,7 +93,7 @@ if (process.env.VERCEL !== '1') {
     try {
       await initializeNestApp();
       const port = Number(process.env.PORT) || 3016;
-      server.listen(port, () => {
+      server.listen(port, '127.0.0.1', () => {
         logger.log(`Rahyar API is running on port ${port}`);
       });
     } catch (error) {

@@ -23,3 +23,9 @@
 - During audits, follow each workflow end to end across UI, API, authorization, and persistence. Verify organization and province scoping for every read, write, import, export, and aggregate; never infer access from client-supplied province values alone.
 - **Rahcom province prerequisite:** Every Rahcom data operation requires at least one active organization branch mapped to a supported Rahcom province and the current user must either have a province assignment or explicitly select one in the top header. A single configured province must never be auto-selected. `/rahcom/me` may return the configured province IDs and access state for the selector; all other Rahcom operations must enforce both the user's province eligibility and organization scope.
 - Keep the Rahyar product surface limited to Rahcom, Settings, and Development. Do not restore ERP business modules or ERP-specific roadmap assumptions.
+
+## Local Windows server configuration
+
+- Keep local development on API port 3016 and the Windows server API on port 3116, bound to loopback behind Caddy.
+- Rahyar has no demo login or demo account. Do not seed a demo user or membership in test-data setup.
+- For authorized Windows server database updates, apply checked-in migrations with `npm exec -- prisma migrate deploy --schema=prisma/schema`; preserve the existing database and migration history.
