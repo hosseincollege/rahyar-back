@@ -7,8 +7,12 @@ import {
   Post,
   Put,
   Query,
+  StreamableFile,
+  UploadedFile,
+  UseInterceptors,
   UseGuards,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../core/auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../core/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../core/auth/guards/roles.guard';
@@ -38,6 +42,8 @@ import {
   UpdateRahcomImportedTicketDescriptionDto,
   ReplaceRahcomBillIdentifierListDto,
   ReplaceRahcomSitesListDto,
+  ReplaceRahcomMissionListDto,
+  SaveRahcomMissionDefaultsDto,
   CreateRahcomInventoryEntryDto,
 } from './rahcom.dto';
 import { RahcomService } from './rahcom.service';
@@ -78,6 +84,28 @@ export class RahcomController {
     @Body() body: ReplaceRahcomSitesListDto,
   ) {
     return this.service.replaceSites(user, body);
+  }
+  @Get('missions')
+  listMissions(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RahcomProvinceQueryDto,
+  ) {
+    return this.service.listMissions(user, query.province);
+  }
+  @Put('missions')
+  replaceMissions(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: ReplaceRahcomMissionListDto,
+  ) {
+    return this.service.replaceMissions(user, body);
+  }
+  @Get('missions/defaults')
+  getMissionDefaults(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {
+    return this.service.getMissionDefaults(user, query.province);
+  }
+  @Put('missions/defaults')
+  saveMissionDefaults(@CurrentUser() user: AuthenticatedUser, @Body() body: SaveRahcomMissionDefaultsDto) {
+    return this.service.saveMissionDefaults(user, body);
   }
   @Get('systems/search')
   searchSystems(
@@ -228,6 +256,46 @@ export class RahcomController {
     @Query() query: RahcomProvinceQueryDto,
   ) {
     return this.service.getBillIdentifiers(user, query.province);
+  }
+  @Get('invoices')
+  getInvoices(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RahcomProvinceQueryDto,
+  ) {
+    return this.service.getInvoices(user, query.province);
+  }
+  @Get('invoice-attachments')
+  getInvoiceAttachments(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: RahcomProvinceQueryDto,
+  ) {
+    return this.service.getInvoiceAttachments(user, query.province);
+  }
+  @Post('invoice-attachments')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 20 * 1024 * 1024 } }),
+  )
+  uploadInvoiceAttachment(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: { province?: string; invoiceNumber?: string; category?: string },
+    @UploadedFile()
+    file:
+      | { buffer: Buffer; originalname: string; mimetype: string; size: number }
+      | undefined,
+  ) {
+    return this.service.uploadInvoiceAttachment(user, body, file);
+  }
+  @Get('invoice-attachments/:id/file')
+  async getInvoiceAttachmentFile(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    const file = await this.service.getInvoiceAttachmentFile(user, id);
+    const disposition = `inline; filename*=UTF-8''${encodeURIComponent(file.originalName)}`;
+    return new StreamableFile(file.content, {
+      type: file.mimeType,
+      disposition,
+    });
   }
   @Get('inventory')
   listInventory(@CurrentUser() user: AuthenticatedUser, @Query() query: RahcomProvinceQueryDto) {

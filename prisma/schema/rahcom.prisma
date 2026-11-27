@@ -171,6 +171,41 @@ model RahcomBillIdentifierList {
   @@map("rahcom_bill_identifier_lists")
 }
 
+model RahcomInvoiceList {
+  id             String       @id @default(cuid())
+  organizationId String
+  province       String       @db.VarChar(80)
+  headers        Json         @db.JsonB
+  rows           Json         @db.JsonB
+  updatedById    String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, province])
+  @@index([organizationId, updatedAt])
+  @@map("rahcom_invoice_lists")
+}
+
+model RahcomInvoiceAttachment {
+  id             String       @id @default(cuid())
+  organizationId String
+  province       String       @db.VarChar(80)
+  invoiceNumber  String       @db.VarChar(80)
+  category       String       @db.VarChar(32)
+  originalName   String       @db.VarChar(255)
+  mimeType       String       @db.VarChar(80)
+  size           Int
+  storagePath    String?      @db.VarChar(1024)
+  content        Bytes?       @db.ByteA
+  createdById    String
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, province, invoiceNumber, category])
+  @@map("rahcom_invoice_attachments")
+}
+
 model RahcomSitesList {
   id             String       @id @default(cuid())
   organizationId String
@@ -185,6 +220,44 @@ model RahcomSitesList {
   @@unique([organizationId, province])
   @@index([organizationId, updatedAt])
   @@map("rahcom_sites_lists")
+}
+
+model RahcomMissionList {
+  id             String       @id @default(cuid())
+  organizationId String
+  province       String       @db.VarChar(80)
+  fileName       String       @db.VarChar(255)
+  sheetName      String       @db.VarChar(120)
+  headers        Json         @db.JsonB
+  rows           Json         @db.JsonB
+  rowCount       Int
+  updatedById    String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, province])
+  @@index([organizationId, updatedAt])
+  @@map("rahcom_mission_lists")
+}
+
+model RahcomMissionDefaults {
+  id                         String       @id @default(cuid())
+  organizationId             String
+  province                   String       @db.VarChar(80)
+  requestType                String       @db.VarChar(100)
+  provincialManager          String       @db.VarChar(200)
+  missionField               String       @db.VarChar(200)
+  provincialOfficeSupervisor String       @db.VarChar(200)
+  provincialOperationsExpert String       @db.VarChar(200)
+  updatedById                String
+  createdAt                  DateTime     @default(now())
+  updatedAt                  DateTime     @updatedAt
+  organization               Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, province])
+  @@index([organizationId, updatedAt])
+  @@map("rahcom_mission_defaults")
 }
 
 model RahcomInventoryEntry {

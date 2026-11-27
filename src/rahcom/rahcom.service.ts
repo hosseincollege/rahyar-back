@@ -5,6 +5,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import * as path from 'node:path';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../core/prisma/prisma.service';
 import type { AuthenticatedUser } from '../core/auth/jwt.strategy';
@@ -24,6 +27,8 @@ import type {
   SaveRahcomDailyWorkflowDto,
   ReplaceRahcomBillIdentifierListDto,
   ReplaceRahcomSitesListDto,
+  ReplaceRahcomMissionListDto,
+  SaveRahcomMissionDefaultsDto,
   RahcomSystemImportRowDto,
   RahcomSystemLookupDto,
   CreateRahcomInventoryEntryDto,
@@ -43,6 +48,332 @@ type RahcomAccess = {
 };
 
 const excludedIsfahanSystemCode = '065P63087';
+
+const initialIsfahanInvoiceHeaders = [
+  'شماره سند',
+  'تاریخ سند',
+  'شرح',
+  'کد سامانه/محور',
+  'مبلغ (ریال)',
+  'ذی‌نفع',
+  'شماره شبا/حساب',
+  'وضعیت پرداخت',
+  'پیگیری‌های گروه',
+  'تاریخ پیام',
+];
+const initialIsfahanInvoiceRows = [
+  [
+    '1430',
+    '',
+    'مراجعه به سامانه 586N13202',
+    '586N13202',
+    '',
+    '',
+    '',
+    'درخواست پرداخت؛ وضعیت نهایی نامشخص',
+    'شرح فاکتور در پیام بازارسال‌شده آمده؛ در ۲۷ آبان پرداخت درخواست و لینک شماره سند ارسال شد.',
+    '۲ و ۲۷ آبان',
+  ],
+  [
+    '1454',
+    '405/08/25',
+    'هزینه باربری؛ مناقصه 961w13201',
+    'مناقصه 961w13201',
+    '4000000',
+    '',
+    '260170000000221308469004',
+    'تأیید شد',
+    'درخواست تأیید در ۲۷ آبان؛ در ۳۰ آبان پاسخ «تأیید شد». عبارت «چنگانی» پیش از شماره آمده، اما نقش آن و اینکه شماره حساب است یا شبا صریح نیست.',
+    '۲۷ و ۳۰ آبان',
+  ],
+  [
+    '1455',
+    '405/08/23',
+    'هزینه بالابر جهت رفع خرابی محور کاشان',
+    '007w14009 / 071D13004 / 071n13005 / 007e13008',
+    '156000000',
+    'مهدی قاسمی',
+    '930190000000305911637002',
+    'اعلام‌شده در گروه',
+    'شروع و پایان تردد بالابر برای سند اعلام شد؛ سند دوباره در گروه ارسال شد.',
+    '۴ آذر',
+  ],
+  [
+    '1456',
+    '405/08/27',
+    'بارنامه ارسال انکر شابلون برای ۵ استان',
+    'بدون کد سامانه (طبق پیام)',
+    '16000000',
+    'امیرحسین رشیدی',
+    '95016000000000100242755',
+    'در انتظار پیگیری',
+    'درخواست پرداخت در ۱ آذر و درخواست واریز مجدد در ۱ آذر؛ درباره شبا درخواست اصلاح شد و فرستنده گفت صحیح است. در ۴ آذر گفته شد فاکتور این استان اعلام نشده است.',
+    '۲۷ آبان تا ۴ آذر',
+  ],
+  [
+    '1457',
+    '405/0825',
+    'هزینه بالابر جهت رفع خرابی و شستشوی پنل',
+    '',
+    '110500000',
+    'مهدی قاسمی',
+    '930190000000305911637003',
+    'اعلام‌شده در گروه',
+    'شروع و پایان تردد بالابر برای سند اعلام شد.',
+    '۴ آذر',
+  ],
+  [
+    '1458',
+    '405/09/03',
+    'هزینه بالابر؛ خرابی و بررسی سامانه‌های 586n/13201/13202/13203/13204',
+    '586n / 13201 / 13202 / 13203 / 13204',
+    '182000000',
+    'مهدی قاسمی',
+    '930190000000305911637001',
+    'اعلام‌شده در گروه',
+    'محور موته گلپایگان؛ شروع و پایان تردد بالابر برای سند اعلام شد.',
+    '۴ آذر',
+  ],
+  ['1422', '405/07/11', 'هزینه جرثقیل برای نصب دکل سامانه 009E13002', '009E13002', '180000000', 'محمد دانشمند', '120190000000333811110005', 'درخواست پرداخت', 'در گروه تأیید و پرداخت درخواست شده است.', '۲ آبان'],
+  ['1423', '405/07/11', 'هزینه جرثقیل برای نصب دکل سامانه 009E13002؛ تصویر سند اصلاح شد', '009E13002', '170000000', 'محمد دانشمند', '120190000000333811110005', 'درخواست پرداخت', 'برای سند ۱۴۲۳ درخواست تأیید و پرداخت شد؛ پیام اصلاحیه تصویر نیز ارسال شد.', '۲ آبان'],
+  ['1424', '405/07/11', 'هزینه حمل دکل 009E13002 با جرثقیل کفی', '009E13002', '50000000', 'محمد دانشمند', '120190000000333811110005', 'درخواست پرداخت', 'برای تأیید و پرداخت درخواست شده است.', '۲ آبان'],
+  ['1425', '405/07/19', 'باربری و تحویل تجهیز سامانه 007E13025', '007E13025', '7200000', 'چنگانی', '260170000000221308469004', 'پرداخت‌شده (با قرینه پیام)', 'برای پرداخت همراه ۱۴۲۹ درخواست شد؛ سپس در گروه گفته شد «این دو مورد پرداخت شد». انتساب پرداخت بر اساس همان رشته پیام است.', '۲ آبان'],
+  ['1426', '405/07/25', 'کرایه جرثقیل جهت نصب تجهیزات در سامانه 586N13204', '586N13204', '85000000', 'مصطفایی', '600160000000000148050339', 'درخواست پرداخت', 'پرداخت ۱۴۲۶ و ۱۴۲۷ درخواست شد و ثبت فاکتور در سامانه تأیید شد.', '۲ آبان'],
+  ['1427', '405/07/25', 'کرایه حمل تجهیزات به سامانه 586N13204', '586N13204', '25000000', 'اسفندیاری', '600180000000177023672051', 'درخواست پرداخت', 'پرداخت ۱۴۲۶ و ۱۴۲۷ درخواست شد و ثبت فاکتور در سامانه تأیید شد.', '۲ آبان'],
+  ['1428', '', 'نصب پنل دوم خورشید و روشنایی ۲۰۰ سامانه 586N13204', '586N13204', '', '', '', 'درخواست تأیید و پرداخت؛ وضعیت نهایی نامشخص', 'درخواست پرداخت همراه اسناد ۱۴۲۵ و ۱۴۲۹ مطرح شد؛ مبلغ در پیام‌های قابل مشاهده نیست.', '۲ آبان'],
+  [
+    '1429', '', 'هزینه بارنامه سامانه 586n13204', '586n13204', '', 'چنگانی',
+    '260170000000221308469004', 'پرداخت‌شده',
+    'پرداخت سندهای ۱۴۲۹ و ۱۴۲۵ درخواست شد و سپس گفته شد «این دو مورد پرداخت شد». مبلغ در پیام درج نشده است.', '۲ آبان',
+  ],
+  [
+    '1432', '', 'مراجعه به سامانه 062N13024', '062N13024', '', '', '',
+    'جزئیات مبلغ و پرداخت درج نشده', 'شرح فاکتور در پیام بازارسال‌شده آمده است.', '۲ آبان',
+  ],
+  [
+    '1434', '', 'مراجعه به سامانه 007W13029', '007W13029', '', '', '',
+    'جزئیات مبلغ و پرداخت درج نشده', 'شرح فاکتور در پیام بازارسال‌شده آمده است.', '۲ آبان',
+  ],
+  [
+    '1435', '', 'مراجعه به سامانه 007E13001', '007E13001', '', '', '',
+    'جزئیات مبلغ و پرداخت درج نشده', 'شرح فاکتور در پیام بازارسال‌شده آمده است.', '۲ آبان',
+  ],
+  [
+    '1436', '', 'مراجعه به سامانه 007E13005', '007E13005', '', '', '',
+    'درخواست پرداخت', 'شرح فاکتور در پیام بازارسال‌شده آمده است؛ در ۱۸ آبان صریحاً پرداخت سند درخواست و لینک شماره ارسال شد.', '۲ و ۱۸ آبان',
+  ],
+  [
+    '1437', '', 'مراجعه به سامانه 065E13015', '065E13015', '', '', '',
+    'درخواست پرداخت', 'شرح فاکتور در پیام بازارسال‌شده آمده است؛ در ۲۴ آبان پرداخت همراه سند ۱۴۳۹ درخواست شد. ارتباط مبلغ کلی ۲۰ میلیون تومانی با هر سند روشن نیست.', '۲ و ۲۴ آبان',
+  ],
+  [
+    '1438', '', 'مراجعه به سامانه 062S13015', '062S13015', '', '', '',
+    'جزئیات مبلغ و پرداخت درج نشده', 'شرح فاکتور در پیام بازارسال‌شده آمده است.', '۲ آبان',
+  ],
+  [
+    '1440', '', 'مراجعه به سامانه 007W13024', '007W13024', '', '', '',
+    'جزئیات مبلغ و پرداخت درج نشده', 'شرح فاکتور در پیام بازارسال‌شده آمده است.', '۲ آبان',
+  ],
+  [
+    '1441', '', 'مراجعه به سامانه 047N13002', '047N13002', '', '', '',
+    'جزئیات مبلغ و پرداخت درج نشده', 'شرح فاکتور در پیام بازارسال‌شده آمده است.', '۲ آبان',
+  ],
+  [
+    '1442', '405/07/27', 'کپی مدارک جهت وضعیت سامانه 656e13204', '656e13204', '',
+    'ناصر لطیفی', '470600241670006993450001', 'مبلغ نهایی نامشخص',
+    'مبلغ اولیه 2,200,000 ریال درج شد؛ درباره مبلغ سؤال شد و پاسخ «اصلاح شد» آمد، اما مبلغ اصلاح‌شده در پیام‌های قابل مشاهده نیست.',
+    '۲ آبان',
+  ],
+  [
+    '1443', '405/07/58', 'هزینه باربری انتقال تجهیزات سامانه‌های 051s13001 و 961w13002',
+    '051s13001 / 961w13002', '1000000', 'حسن‌پور', '240170000000337032267005',
+    'اعلام‌شده در گروه', 'تاریخ سند در پیام به‌شکل نامعتبر 405/07/58 درج شده؛ بدون اصلاح حدسی همان‌طور ثبت شد.', '۲ آبان',
+  ],
+  [
+    '1453', '405/08/21', 'رفع خرابی',
+    '062s13002 / 071e13010 / 62n13024 / 071e13030', '15600000', 'مهدی قاسمی',
+    '930190000000305911637001', 'اعلام‌شده در گروه',
+    'محور نایین؛ شروع و پایان تردد بالابر برای سند بازارسال شد.', '۲۱ آبان',
+  ],
+  [
+    '1452', '405/08/18', 'رفع خرابی سامانه‌های 009w13001/047s13005/047n13005',
+    '009w13001 / 047s13005 / 047n13005', '16250000', 'مهدی قاسمی',
+    '930190000000350911637001', 'اعلام‌شده در گروه',
+    'شروع و پایان تردد بالابر برای سند بازارسال شد.', '۱۸ آبان',
+  ],
+  [
+    '1451', '405/08/13', 'رفع خرابی سامانه 007e13025', '007e13025', '12350000',
+    'مهدی قاسمی', '930190000000350911637001', 'اعلام‌شده در گروه',
+    'پیام سند در گروه با علامت ✅ نمایش داده شد؛ شروع و پایان تردد بالابر اعلام شد.', '۱۳ آبان',
+  ],
+  [
+    '1446', '405/07/28', 'هزینه جرثقیل/بالابر برای حمل بتن و دکل روشنایی از انبار راهداری شاهین‌شهر به محور فولادشهر، نصب کابل برق پروژکتور هوایی',
+    '961w13202', '150000000', 'محمد دانشمند', '120190000000333811110005',
+    'تأیید شد؛ پرداخت درخواست شد',
+    'مستندات ۱۴۴۶/۱۴۴۷ ارسال شد؛ مبالغ توافقی و پیش از شروع با آقای بیرانوند هماهنگ شده بود. در ۱۲ آبان درخواست پرداخت شد و در ۱۳ آبان نیکتا گفت همه فاکتورهای ارسال‌شده را تأیید کرده است؛ مبلغ بالاتر از سقف ذکر شد.',
+    '۴ تا ۱۳ آبان',
+  ],
+  [
+    '1447', '405/07/28', 'هزینه بالابر خاور؛ مراجعه از فولادشهر به سامانه کنار لایبید و رفع خرابی روتر و دوربین',
+    '051s13004؛ محور 13005', '100000000', 'محمد دانشمند', '120190000000333811110005',
+    'تأیید شد؛ پرداخت درخواست شد',
+    'مستندات ۱۴۴۶/۱۴۴۷ ارسال شد؛ مبالغ توافقی و پیش از شروع با آقای بیرانوند هماهنگ شده بود. در ۱۲ آبان درخواست پرداخت شد و در ۱۳ آبان نیکتا گفت همه فاکتورهای ارسال‌شده را تأیید کرده است؛ مبلغ بالاتر از سقف ذکر شد.',
+    '۴ تا ۱۳ آبان',
+  ],
+  [
+    '1448', '405/08/04', 'رفع خرابی، تعویض و نظافت دوربین و تنظیم پروژکتورها؛ تحویل به آقای معصومی',
+    '047n13002؛ محور 13005', '', '', '', 'جزئیات مبلغ و پرداخت درج نشده',
+    'شروع و پایان بالابر برای محور خمین در ۴ آبان اعلام شد.', '۴ و ۵ آبان',
+  ],
+  [
+    '1449', '405/08/10', 'هزینه بالابر جهت رفع خرابی سامانه‌های 062n13004 و 062s13002',
+    '062n13004 / 062s13002', '71500000', 'مهدی قاسمی', '9301900000003059116337001',
+    'اعلام‌شده در گروه', 'شروع و پایان تردد بالابر برای ۱۰ آبان اعلام شد.', '۱۰ آبان',
+  ],
+  [
+    '1431', '', 'مراجعه به سامانه 062N13020', '062N13020', '', '', '',
+    'جزئیات پرداخت نامشخص', 'شرح فاکتور در پیام بازارسال‌شده آمده است؛ لینک شماره سند نیز در ۲۰ آبان ارسال شد.', '۲ و ۲۰ آبان',
+  ],
+  [
+    '1403', '', 'شرح و مبلغ در پیام‌های قابل مشاهده درج نشده است.', '', '', '', '',
+    'وضعیت پرداخت نامشخص',
+    'در ۲۰ و ۲۳ آبان درخواست پرداخت شد؛ سپس «قبلاً پرداخت شده» گفته شد، اما فرستنده گفت رسید واریزی ندارد.',
+    '۲۰ و ۲۳ آبان',
+  ],
+  [
+    '1433', '', 'مراجعه به سامانه 051S13001', '051S13001', '', '', '',
+    'جزئیات پرداخت نامشخص', 'شرح فاکتور در پیام بازارسال‌شده آمده؛ در ۲۱ آبان لینک شماره سند و پیام «ممنون» دیده شد.', '۲ و ۲۱ آبان',
+  ],
+  [
+    '1401', '', 'شرح و مبلغ در پیام‌های قابل مشاهده درج نشده است.', '', '', '', '',
+    'درخواست پرداخت', 'درخواست پرداخت همراه اسناد ۱۴۴۴، ۱۴۴۵ و ۱۴۵۰؛ لینک شماره سند فرستاده شد.', '۲۳ آبان',
+  ],
+  [
+    '1444', '405/08/03', 'هزینه باربری جهت تحویل مدارک سامانه 063D13010', '063D13010', '',
+    'چنگانی', '6037997540870863', 'درخواست پرداخت؛ برای ثبت تأیید شد',
+    'در ۳ آبان درباره ثبت فاکتور به نام های‌وب سؤال شد؛ پاسخ داده شد فاکتورها باید به نام رهکام باشند و اگر اشتباه صادر شده اصلاح شود. در ۲۳ آبان پرداخت درخواست شد و در ۲۵ آبان تأیید برای ثبت با ✅ اعلام شد.',
+    '۳، ۲۳ و ۲۵ آبان',
+  ],
+  [
+    '1445', '', 'هزینه کپی جهت صورت‌وضعیت سامانه توسعه', '961w13202', '5280000',
+    'چنگانی', '260170000000221308469004', 'درخواست پرداخت',
+    'در ۳ آبان پیام سند با ✅ نمایش داده شد؛ در ۲۳ آبان پرداخت همراه اسناد ۱۴۰۱، ۱۴۴۴ و ۱۴۵۰ درخواست شد و لینک شماره سند ارسال شد.',
+    '۳ و ۲۳ آبان',
+  ],
+  [
+    '1450', '405/08/12', 'هزینه باربری ارسال تجهیزات جهت سامانه 062n13024', '062n13024',
+    '700000', 'چنگانی', '6037997540870863', 'درخواست پرداخت',
+    'در ۱۲ آبان شماره سند ارسال شد؛ در ۲۳ آبان پرداخت آن همراه اسناد ۱۴۰۱، ۱۴۴۴ و ۱۴۴۵ درخواست شد.',
+    '۱۲ و ۲۳ آبان',
+  ],
+  [
+    '1439', '', 'مراجعه به سامانه 062N13013', '062N13013', '', '', '',
+    'درخواست پرداخت', 'شرح فاکتور در پیام بازارسال‌شده آمده است؛ در ۲۴ آبان پرداخت همراه سند ۱۴۳۷ درخواست و لینک‌ها ارسال شد. ارتباط مبلغ کلی ۲۰ میلیون تومانی با هر سند روشن نیست.',
+    '۲ و ۲۴ آبان',
+  ],
+  [
+    '1394', '', 'بابت نصب پنل خورشیدی سامانه 586N13202', '586N13202', '', '', '',
+    'درخواست پرداخت؛ تأیید نامشخص',
+    'گفته شد مدت زیادی بدهکارند؛ لینک فاکتور ارسال شد و پیام با ✅ واکنش گرفت. در همان روز درخواست کلی فاکتور ۱۵ میلیون تومانی نیز مطرح شد، اما مبلغ این سند جداگانه نیامده است.',
+    '۲۵ آبان',
+  ],
+  [
+    '1392',
+    '',
+    'شرح و مبلغ در پیام‌های قابل مشاهده درج نشده است.',
+    '',
+    '',
+    '',
+    '',
+    'درخواست پرداخت',
+    'همراه اسناد ۱۴۱۰، ۱۴۱۳ و ۱۴۱۵ برای پرداخت درخواست شد؛ سپس اصلاحیه ثبت شماره شبا اعلام شد.',
+    '۳۰ آبان تا ۱ آذر',
+  ],
+  [
+    '1410',
+    '',
+    'شرح و مبلغ در پیام‌های قابل مشاهده درج نشده است.',
+    '',
+    '',
+    '',
+    '',
+    'پرداخت‌شده',
+    'در گروه صریحاً «۱۴۱۰ پرداخت شده» اعلام شد.',
+    '۱ آذر',
+  ],
+  [
+    '1413',
+    '',
+    'شرح و مبلغ در پیام‌های قابل مشاهده درج نشده است.',
+    '',
+    '',
+    '',
+    '',
+    'درخواست پرداخت',
+    'همراه اسناد ۱۳۹۲، ۱۴۱۰ و ۱۴۱۵ برای پرداخت درخواست شد.',
+    '۳۰ آبان تا ۱ آذر',
+  ],
+  [
+    '1415',
+    '',
+    'شرح و مبلغ در پیام‌های قابل مشاهده درج نشده است.',
+    '',
+    '',
+    '',
+    '',
+    'درخواست پرداخت',
+    'همراه اسناد ۱۳۹۲، ۱۴۱۰ و ۱۴۱۳ برای پرداخت درخواست شد.',
+    '۳۰ آبان تا ۱ آذر',
+  ],
+  [
+    '1393',
+    '',
+    'شرح و مبلغ در پیام‌های قابل مشاهده درج نشده است.',
+    '',
+    '',
+    '',
+    '',
+    'درخواست واریز',
+    'درخواست واریز همراه اسناد ۱۳۸۵ و ۱۴۵۶؛ شماره سند دوباره در گروه فرستاده شد.',
+    '۱ آذر',
+  ],
+  [
+    '1385',
+    '',
+    'شرح و مبلغ در پیام‌های قابل مشاهده درج نشده است.',
+    '',
+    '',
+    '',
+    '',
+    'درخواست واریز',
+    'درخواست واریز همراه اسناد ۱۳۹۳ و ۱۴۵۶؛ شماره سند دوباره در گروه فرستاده شد.',
+    '۱ آذر',
+  ],
+  [
+    '1416',
+    '',
+    'شرح و مبلغ در پیام‌های قابل مشاهده درج نشده است.',
+    '',
+    '',
+    '',
+    '',
+    'درخواست پرداخت',
+    'پس از درخواست فاکتور ۱۰ میلیون تومانی، پرداخت سند ۱۴۱۶ درخواست شد؛ ارتباط مبلغ با این سند در پیام روشن نیست.',
+    '۳ و ۴ آذر',
+  ],
+  [
+    '',
+    '',
+    'یادداشت کلی گروه',
+    '',
+    '',
+    '',
+    '',
+    '',
+    'درخواست‌های کلی اعلام فاکتور ۳۰ و ۲۰ میلیون تومانی در گروه هست؛ پیام‌ها ارتباط قطعی این مبلغ‌ها را با شماره سند مشخص نمی‌کنند.',
+    '۳۰ آبان و ۱ آذر',
+  ],
+];
 
 function cellText(value: unknown): string {
   if (typeof value === 'string') return value;
@@ -347,6 +678,59 @@ export class RahcomService {
     });
     return { saved: true, province, updatedAt: saved.updatedAt };
   }
+  async listMissions(user: AuthenticatedUser, requestedProvince?: string) {
+    const access = await this.authorize(user);
+    const province = this.scopedProvince(access, requestedProvince);
+    if (!province) throw new BadRequestException('Select a single province to view missions.');
+    return this.prisma.rahcomMissionList.findUnique({
+      where: { organizationId_province: { organizationId: access.organizationId, province } },
+      select: { province: true, fileName: true, sheetName: true, headers: true, rows: true, rowCount: true, updatedAt: true },
+    });
+  }
+  async replaceMissions(user: AuthenticatedUser, body: ReplaceRahcomMissionListDto) {
+    const access = await this.authorize(user, true);
+    const province = this.scopedProvince(access, body.province);
+    if (!province) throw new BadRequestException('Select a single province to save missions.');
+    if (body.headers.length < 2 || body.headers.some((header) => !header.trim() || header.length > 120))
+      throw new BadRequestException('Mission headers are invalid.');
+    const normalizedHeaders = body.headers.map(normalizeBillHeader);
+    if (new Set(normalizedHeaders).size !== normalizedHeaders.length)
+      throw new BadRequestException('Mission headers must be unique.');
+    if (body.rows.some((row) => !Array.isArray(row) || row.length !== body.headers.length || row.some((value) => typeof value !== 'string' || value.length > 10000)))
+      throw new BadRequestException('Mission rows must contain text values matching the column count.');
+    const provinceIndex = normalizedHeaders.findIndex((header) => header === normalizeBillHeader('استان') || header === 'province');
+    if (provinceIndex < 0 || body.rows.some((row) => !['اصفهان', 'isfahan'].includes(normalizeBillHeader(row[provinceIndex]))))
+      throw new BadRequestException('Every mission row must belong to Isfahan.');
+    const serializedSize = Buffer.byteLength(JSON.stringify({ headers: body.headers, rows: body.rows }), 'utf8');
+    if (serializedSize > 10 * 1024 * 1024) throw new BadRequestException('Mission list exceeds the 10 MB limit.');
+    const saved = await this.prisma.rahcomMissionList.upsert({
+      where: { organizationId_province: { organizationId: access.organizationId, province } },
+      create: { organizationId: access.organizationId, province, fileName: body.fileName, sheetName: body.sheetName, headers: body.headers, rows: body.rows, rowCount: body.rows.length, updatedById: user.id },
+      update: { fileName: body.fileName, sheetName: body.sheetName, headers: body.headers, rows: body.rows, rowCount: body.rows.length, updatedById: user.id },
+      select: { updatedAt: true },
+    });
+    return { saved: true, province, rowCount: body.rows.length, updatedAt: saved.updatedAt };
+  }
+  async getMissionDefaults(user: AuthenticatedUser, requestedProvince?: string) {
+    const access = await this.authorize(user);
+    const province = this.scopedProvince(access, requestedProvince);
+    if (!province) throw new BadRequestException('Select a single province to view mission defaults.');
+    return this.prisma.rahcomMissionDefaults.findUnique({
+      where: { organizationId_province: { organizationId: access.organizationId, province } },
+      select: { province: true, requestType: true, provincialManager: true, missionField: true, provincialOfficeSupervisor: true, provincialOperationsExpert: true, updatedAt: true },
+    });
+  }
+  async saveMissionDefaults(user: AuthenticatedUser, body: SaveRahcomMissionDefaultsDto) {
+    const access = await this.authorize(user, true);
+    const province = this.scopedProvince(access, body.province);
+    if (!province) throw new BadRequestException('Select a single province to save mission defaults.');
+    return this.prisma.rahcomMissionDefaults.upsert({
+      where: { organizationId_province: { organizationId: access.organizationId, province } },
+      create: { organizationId: access.organizationId, province, requestType: body.requestType.trim(), provincialManager: body.provincialManager.trim(), missionField: body.missionField.trim(), provincialOfficeSupervisor: body.provincialOfficeSupervisor.trim(), provincialOperationsExpert: body.provincialOperationsExpert.trim(), updatedById: user.id },
+      update: { requestType: body.requestType.trim(), provincialManager: body.provincialManager.trim(), missionField: body.missionField.trim(), provincialOfficeSupervisor: body.provincialOfficeSupervisor.trim(), provincialOperationsExpert: body.provincialOperationsExpert.trim(), updatedById: user.id },
+      select: { province: true, requestType: true, provincialManager: true, missionField: true, provincialOfficeSupervisor: true, provincialOperationsExpert: true, updatedAt: true },
+    });
+  }
   async getRahcomAccess(user: AuthenticatedUser) {
     const access = await this.authorize(user, false, true);
     return {
@@ -594,6 +978,191 @@ export class RahcomService {
       jsonRows(list.rows).map((row) => row.map(cellText)),
     );
     return { ...normalized, updatedAt: list.updatedAt };
+  }
+  async getInvoices(user: AuthenticatedUser, requestedProvince?: string) {
+    const access = await this.authorize(user);
+    const province = this.scopedProvince(access, requestedProvince);
+    if (!province)
+      throw new BadRequestException('Select a single province to read invoices.');
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: access.organizationId },
+      select: { slug: true },
+    });
+    const invoiceSeedOrganizationSlug =
+      process.env.RAHCOM_INVOICE_SEED_ORGANIZATION_SLUG?.trim() || 'rahyar';
+    const seedIsfahanInvoices =
+      province === 'isfahan' && organization?.slug === invoiceSeedOrganizationSlug;
+    const list = await this.prisma.rahcomInvoiceList.upsert({
+      where: { organizationId_province: { organizationId: access.organizationId, province } },
+      create: {
+        organizationId: access.organizationId,
+        province,
+        headers: seedIsfahanInvoices ? initialIsfahanInvoiceHeaders : [],
+        rows: seedIsfahanInvoices ? initialIsfahanInvoiceRows : [],
+        updatedById: user.id,
+      },
+      update: {},
+      select: { headers: true, rows: true, updatedAt: true },
+    });
+    return {
+      headers: jsonArray(list.headers).map(cellText),
+      rows: jsonRows(list.rows).map((row) => row.map(cellText)),
+      updatedAt: list.updatedAt,
+    };
+  }
+  async getInvoiceAttachments(user: AuthenticatedUser, requestedProvince?: string) {
+    const access = await this.authorize(user);
+    const province = this.scopedProvince(access, requestedProvince);
+    if (!province)
+      throw new BadRequestException('Select a single province to read invoice attachments.');
+    return this.prisma.rahcomInvoiceAttachment.findMany({
+      where: { organizationId: access.organizationId, province },
+      orderBy: [{ invoiceNumber: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        invoiceNumber: true,
+        category: true,
+        originalName: true,
+        mimeType: true,
+        size: true,
+        createdAt: true,
+      },
+    });
+  }
+  async uploadInvoiceAttachment(
+    user: AuthenticatedUser,
+    input: { province?: string; invoiceNumber?: string; category?: string },
+    file?: { buffer: Buffer; originalname: string; mimetype: string; size: number },
+  ) {
+    const access = await this.authorize(user, true);
+    const province = this.scopedProvince(access, input.province);
+    if (!province)
+      throw new BadRequestException('Select a single province to save invoice attachments.');
+    const invoiceNumber = String(input.invoiceNumber ?? '')
+      .trim()
+      .normalize('NFKC')
+      .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0))
+      .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x0660));
+    if (!/^[A-Za-z0-9][A-Za-z0-9./_-]{0,79}$/.test(invoiceNumber))
+      throw new BadRequestException('A valid invoice number is required.');
+    const categories = ['INVOICE', 'PAYMENT_RECEIPT', 'START_PHOTO', 'END_PHOTO', 'OTHER'];
+    const category = String(input.category ?? '');
+    if (!categories.includes(category))
+      throw new BadRequestException('Select a valid invoice attachment category.');
+    if (!file?.buffer?.length || file.size !== file.buffer.length)
+      throw new BadRequestException('Select an image file to upload.');
+    const imageType = this.invoiceAttachmentImageType(file.buffer, file.mimetype);
+    const originalName = String(file.originalname || 'attachment')
+      .replace(/[\\/\u0000-\u001f]/g, '_')
+      .slice(-255);
+    const provinceCode = this.invoiceAttachmentProvinceCode(province);
+    const categoryFolder = this.invoiceAttachmentCategoryFolder(category);
+    const safeInvoiceNumber = invoiceNumber.replace(/[^A-Za-z0-9_-]/g, '-');
+    const originalStem = path.basename(originalName, path.extname(originalName))
+      .normalize('NFKC')
+      .replace(/[^\p{L}\p{N}_-]+/gu, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'image';
+    const extension = imageType === 'image/png' ? '.png' : imageType === 'image/webp' ? '.webp' : '.jpg';
+    const fileName = `${safeInvoiceNumber}_${category.toLowerCase()}_${new Date().toISOString().replace(/[:.]/g, '-')}_${randomUUID().slice(0, 8)}_${originalStem}${extension}`;
+    const storagePath = path.posix.join(provinceCode, categoryFolder, fileName);
+    const absolutePath = this.invoiceAttachmentAbsolutePath(storagePath);
+    await mkdir(path.dirname(absolutePath), { recursive: true });
+    await writeFile(absolutePath, file.buffer, { flag: 'wx' });
+    try {
+      return await this.prisma.rahcomInvoiceAttachment.create({
+        data: {
+          organizationId: access.organizationId,
+          province,
+          invoiceNumber,
+          category,
+          originalName: originalName || 'attachment',
+          mimeType: imageType,
+          size: file.buffer.length,
+          storagePath,
+          createdById: user.id,
+        },
+        select: {
+          id: true,
+          invoiceNumber: true,
+          category: true,
+          originalName: true,
+          mimeType: true,
+          size: true,
+          createdAt: true,
+        },
+      });
+    } catch (error) {
+      await rm(absolutePath, { force: true });
+      throw error;
+    }
+  }
+  async getInvoiceAttachmentFile(user: AuthenticatedUser, id: string) {
+    const access = await this.authorize(user);
+    const attachment = await this.prisma.rahcomInvoiceAttachment.findFirst({
+      where: { id, organizationId: access.organizationId },
+      select: { province: true, originalName: true, mimeType: true, content: true, storagePath: true },
+    });
+    if (!attachment) throw new NotFoundException('Invoice attachment not found.');
+    const province = this.scopedProvince(access, attachment.province);
+    if (!province) throw new NotFoundException('Invoice attachment not found.');
+    if (attachment.storagePath) {
+      try {
+        return { ...attachment, content: await readFile(this.invoiceAttachmentAbsolutePath(attachment.storagePath)) };
+      } catch {
+        throw new NotFoundException('Invoice attachment file is missing from Rahyar Storage.');
+      }
+    }
+    if (attachment.content) {
+      return { ...attachment, content: Buffer.from(attachment.content) };
+    }
+    throw new NotFoundException('Invoice attachment file is missing from Rahyar Storage.');
+  }
+  private invoiceAttachmentAbsolutePath(storagePath: string): string {
+    const root = path.resolve(
+      process.env.RAHYAR_STORAGE_ROOT || path.resolve(process.cwd(), '..', 'Rahyar Storage'),
+    );
+    const absolutePath = path.resolve(root, ...storagePath.split(/[\\/]/));
+    const relative = path.relative(root, absolutePath);
+    if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+      throw new BadRequestException('Invalid invoice attachment storage path.');
+    }
+    return absolutePath;
+  }
+  private invoiceAttachmentProvinceCode(province: string): string {
+    const codes: Record<string, string> = {
+      isfahan: 'ESF', tehran: 'THR', 'east-azerbaijan': 'AZE', 'west-azerbaijan': 'AZW',
+      ardabil: 'ARD', alborz: 'ALB', ilam: 'ILA', bushehr: 'BUS',
+      'charmahal-bakhtiari': 'CHB', 'south-khorasan': 'KHS', 'razavi-khorasan': 'KHR',
+      'north-khorasan': 'KHN', khuzestan: 'KHZ', zanjan: 'ZAN', semnan: 'SEM',
+      'sistan-baluchestan': 'SIB', fars: 'FAR', qazvin: 'QAZ', qom: 'QOM', kurdistan: 'KOR',
+      kerman: 'KER', kermanshah: 'KSH', 'kohgiluyeh-boyerahmad': 'KOB', golestan: 'GOL',
+      gilan: 'GIL', lorestan: 'LOR', mazandaran: 'MAZ', markazi: 'MRK', hormozgan: 'HOR',
+      hamadan: 'HAM', yazd: 'YAZ',
+    };
+    return codes[province] || province.replace(/[^A-Za-z0-9-]/g, '').toUpperCase();
+  }
+  private invoiceAttachmentCategoryFolder(category: string): string {
+    const folders: Record<string, string> = {
+      INVOICE: 'Invoices', PAYMENT_RECEIPT: 'Payment Receipts',
+      START_PHOTO: 'Work Start', END_PHOTO: 'Work End', OTHER: 'Other',
+    };
+    return folders[category] || 'Other';
+  }
+  private invoiceAttachmentImageType(buffer: Buffer, mimeType: string): string {
+    if (
+      mimeType === 'image/png' &&
+      buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+    ) return 'image/png';
+    if (
+      mimeType === 'image/jpeg' &&
+      buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff
+    ) return 'image/jpeg';
+    if (
+      mimeType === 'image/webp' &&
+      buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP'
+    ) return 'image/webp';
+    throw new BadRequestException('Only valid PNG, JPEG, or WebP images can be attached.');
   }
   async replaceBillIdentifiers(
     user: AuthenticatedUser,

@@ -11,6 +11,7 @@ model DepartmentTeam {
   department        Department             @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   manager           Employee?              @relation("DepartmentTeamManager", fields: [managerEmployeeId], references: [id], onDelete: SetNull)
   members           DepartmentTeamMember[]
+  organizationMembers OrganizationMember[]
 
   @@unique([departmentId, code])
   @@index([organizationId, departmentId])

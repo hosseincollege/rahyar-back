@@ -53,7 +53,11 @@ model Organization {
   rahcomRoadLists     RahcomRoadList[]
   rahcomBillIdentifierLists RahcomBillIdentifierList[]
   rahcomSitesLists     RahcomSitesList[]
+  rahcomMissionLists   RahcomMissionList[]
+  rahcomMissionDefaults RahcomMissionDefaults[]
   rahcomInventoryEntries RahcomInventoryEntry[]
+  rahcomInvoiceLists   RahcomInvoiceList[]
+  rahcomInvoiceAttachments RahcomInvoiceAttachment[]
 
   @@index([installationId])
   @@index([status])
@@ -64,6 +68,9 @@ model OrganizationMember {
   id             String           @id @default(cuid())
   organizationId String
   userId         String
+  branchId       String?
+  departmentId   String?
+  teamId         String?
   rahcomProvince String?          @db.VarChar(80)
   rahcomSelectedProvince String?  @db.VarChar(80)
   status         MembershipStatus @default(ACTIVE)
@@ -74,6 +81,9 @@ model OrganizationMember {
   roles          MemberRole[]
   organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch         Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  department     Department?      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  team           DepartmentTeam?  @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
   @@unique([organizationId, userId])
   @@index([userId])
@@ -99,6 +109,7 @@ model Branch {
   departments        Department[]
   employees          Employee[]
   announcements      Announcement[]
+  memberships        OrganizationMember[]
 
   @@unique([organizationId, code]) // یکتایی کد در سطح هر سازمان
   @@index([organizationId])
@@ -118,6 +129,7 @@ model Department {
   branch             Branch?             @relation(fields: [branchId], references: [id])
   organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   employees          Employee[]
+  memberships        OrganizationMember[]
   managerEmployeeId  String?
   manager            Employee?           @relation("DepartmentManager", fields: [managerEmployeeId], references: [id], onDelete: SetNull)
   teams              DepartmentTeam[]

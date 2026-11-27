@@ -11,6 +11,7 @@
     "scripts": {
         "build": "prisma generate --schema=prisma/schema && nest build",
         "db:push": "prisma db push --schema=prisma/schema",
+        "storage:migrate-invoice-attachments": "node scripts/migrate-invoice-attachments.mjs",
         "postinstall": "prisma generate --schema=prisma/schema",
         "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
         "start": "nest start",

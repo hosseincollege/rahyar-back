@@ -306,6 +306,23 @@ export class ReplaceRahcomSitesListDto {
   @IsArray() @ArrayMaxSize(10000) rows!: string[][];
 }
 
+export class ReplaceRahcomMissionListDto {
+  @IsString() @MaxLength(80) @Matches(/^[a-z]+(?:-[a-z]+)*$/) province!: string;
+  @IsString() @MinLength(1) @MaxLength(255) fileName!: string;
+  @IsString() @MinLength(1) @MaxLength(120) sheetName!: string;
+  @IsArray() @ArrayMinSize(2) @ArrayMaxSize(100) @IsString({ each: true }) headers!: string[];
+  @IsArray() @ArrayMaxSize(10000) rows!: string[][];
+}
+
+export class SaveRahcomMissionDefaultsDto {
+  @IsString() @MaxLength(80) @Matches(/^[a-z]+(?:-[a-z]+)*$/) province!: string;
+  @IsString() @MinLength(1) @MaxLength(100) requestType!: string;
+  @IsString() @MinLength(1) @MaxLength(200) provincialManager!: string;
+  @IsString() @MinLength(1) @MaxLength(200) missionField!: string;
+  @IsString() @MinLength(1) @MaxLength(200) provincialOfficeSupervisor!: string;
+  @IsString() @MinLength(1) @MaxLength(200) provincialOperationsExpert!: string;
+}
+
 export class UpdateRahcomMemberProvinceDto {
   @IsOptional() @IsString() @MaxLength(80) province?: string | null;
 }
